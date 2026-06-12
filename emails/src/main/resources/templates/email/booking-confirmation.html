@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reserva recibida</title>
+</head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#0f0f0f;padding:32px 40px;text-align:center;">
+            <h1 style="color:#c9a84c;font-size:24px;margin:0;font-weight:700;" th:text="${studio.name}">Estudio</h1>
+            <p style="color:#888;font-size:13px;margin:8px 0 0;">Confirmación de reserva</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px;">
+            <p style="color:#333;font-size:16px;margin:0 0 24px;">
+              Hola <strong th:text="${booking.clientName}">Cliente</strong>,
+            </p>
+            <p style="color:#555;font-size:15px;line-height:1.6;margin:0 0 32px;">
+              Hemos recibido tu solicitud de cita. En breve te confirmamos la reserva.
+            </p>
+
+            <!-- Detalles -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:24px;margin-bottom:32px;">
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #eee;">
+                  <span style="color:#999;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Servicio</span><br/>
+                  <strong style="color:#1a1a1a;font-size:15px;" th:text="${booking.serviceName}">Servicio</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #eee;">
+                  <span style="color:#999;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Fecha</span><br/>
+                  <strong style="color:#1a1a1a;font-size:15px;" th:text="${booking.date}">Fecha</strong>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #eee;">
+                  <span style="color:#999;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Hora</span><br/>
+                  <strong style="color:#1a1a1a;font-size:15px;" th:text="${booking.time}">Hora</strong>
+                </td>
+              </tr>
+              <tr th:if="${booking.notes != null and !booking.notes.isEmpty()}">
+                <td style="padding:8px 0;">
+                  <span style="color:#999;font-size:12px;text-transform:uppercase;letter-spacing:.06em;">Notas</span><br/>
+                  <span style="color:#555;font-size:14px;" th:text="${booking.notes}">Notas</span>
+                </td>
+              </tr>
+            </table>
+
+            <p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 8px;">
+              Si necesitas cambiar o cancelar tu cita, contáctanos en:
+            </p>
+            <p style="margin:0;">
+              <a th:href="'mailto:' + ${studio.email}" th:text="${studio.email}"
+                 style="color:#c9a84c;font-size:14px;">email</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#f9f9f9;padding:24px 40px;text-align:center;border-top:1px solid #eee;">
+            <p style="color:#aaa;font-size:12px;margin:0;" th:text="${studio.name}">Estudio</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

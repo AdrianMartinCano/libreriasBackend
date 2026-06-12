@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head><meta charset="UTF-8"/><title>Mensaje de contacto</title></head>
+<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;">
+        <tr>
+          <td style="background:#0f0f0f;padding:24px 40px;">
+            <p style="color:#c9a84c;font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.1em;">Mensaje de contacto</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f9;border-radius:6px;padding:24px;margin-bottom:24px;">
+              <tr><td style="padding:6px 0;border-bottom:1px solid #eee;">
+                <span style="color:#999;font-size:12px;text-transform:uppercase;">De</span><br/>
+                <strong style="color:#1a1a1a;" th:text="${form.fromName}">-</strong>
+                — <a th:href="'mailto:' + ${form.fromEmail}" th:text="${form.fromEmail}" style="color:#c9a84c;">-</a>
+              </td></tr>
+              <tr th:if="${form.phone != null and !form.phone.isEmpty()}">
+                <td style="padding:6px 0;border-bottom:1px solid #eee;">
+                  <span style="color:#999;font-size:12px;text-transform:uppercase;">Teléfono</span><br/>
+                  <a th:href="'tel:' + ${form.phone}" th:text="${form.phone}" style="color:#c9a84c;">-</a>
+                </td>
+              </tr>
+              <tr><td style="padding:6px 0;border-bottom:1px solid #eee;">
+                <span style="color:#999;font-size:12px;text-transform:uppercase;">Asunto</span><br/>
+                <strong style="color:#1a1a1a;" th:text="${form.subject}">-</strong>
+              </td></tr>
+            </table>
+            <p style="color:#999;font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;">Mensaje</p>
+            <p style="color:#333;font-size:15px;line-height:1.7;margin:0;white-space:pre-line;" th:text="${form.message}">-</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

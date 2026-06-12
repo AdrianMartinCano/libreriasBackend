@@ -1,0 +1,43 @@
+name: Publish Spring Boot modules to GitHub Packages
+
+on:
+  push:
+    tags:
+      - 'v*'   # se dispara con: git tag v1.0.1 && git push --tags
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Configure Maven settings
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml << 'EOF'
+          <settings>
+            <servers>
+              <server>
+                <id>github-adrianmartincano</id>
+                <username>${{ github.actor }}</username>
+                <password>${{ secrets.GITHUB_TOKEN }}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Deploy to GitHub Packages
+        run: mvn deploy -DskipTests --pl common,security,users,products,ecommerce,storage,cms,reservations,emails,newsletter --am
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

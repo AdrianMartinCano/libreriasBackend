@@ -1,0 +1,48 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0          http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.adrianmartincano</groupId>
+    <artifactId>libs-parent</artifactId>
+    <version>1.1.12</version>
+  </parent>
+  <artifactId>spring-newsletter</artifactId>
+  <name>Spring Newsletter</name>
+  <description>Suscripción a newsletter con doble opt-in (confirmación por email) y baja mediante enlace.</description>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- emails de confirmación y baja -->
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-emails</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+</project>
