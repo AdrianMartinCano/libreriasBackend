@@ -16,63 +16,63 @@
 
     <!-- Cubo superior (90°): radio 80 -->
     <g transform="translate(0, -80)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#f97316" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#c2410c" opacity="0.8"/>
     </g>
 
     <!-- Cubo superior derecha (45°): radio 80 -->
     <g transform="translate(57, -57)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#f97316" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#c2410c" opacity="0.8"/>
     </g>
 
     <!-- Cubo derecha (0°): radio 80 -->
     <g transform="translate(80, 0)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#f97316" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#c2410c" opacity="0.8"/>
     </g>
 
     <!-- Cubo inferior derecha (-45°): radio 80 -->
     <g transform="translate(57, 57)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#ea580c" opacity="0.85"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#f97316" opacity="0.6"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#c2410c" opacity="0.75"/>
     </g>
 
     <!-- Cubo inferior (-90°): radio 80 -->
     <g transform="translate(0, 80)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#ea580c" opacity="0.85"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#f97316" opacity="0.6"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#c2410c" opacity="0.75"/>
     </g>
 
     <!-- Cubo inferior izquierda (-135°): radio 80 -->
     <g transform="translate(-57, 57)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#f97316" opacity="0.6"/>
     </g>
 
     <!-- Cubo izquierda (-180°): radio 80 -->
     <g transform="translate(-80, 0)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#f97316" opacity="0.6"/>
     </g>
 
     <!-- Cubo superior izquierda (135°): radio 80 -->
     <g transform="translate(-57, -57)">
-      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
-      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
-      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+      <rect x="-14" y="-14" width="28" height="28" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-14,-14 -1,-25 27,-25 14,-14" fill="#ea580c" opacity="0.7"/>
+      <polygon points="14,-14 27,-25 27,14 14,24" fill="#f97316" opacity="0.6"/>
     </g>
 
   </g>
 
   <!-- Círculo decorativo alrededor del engranaje -->
-  <circle cx="115" cy="128" r="125" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
+  <circle cx="115" cy="128" r="120" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
 
 </svg>
