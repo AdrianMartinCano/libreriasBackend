@@ -8,63 +8,63 @@
   </defs>
 
   <!-- Centro: Símbolo {} -->
-  <g transform="translate(128, 128)">
+  <g transform="translate(115, 128)">
     <!-- Llaves de código en el centro -->
     <text x="0" y="0" font-size="48" font-weight="bold" fill="url(#gradOrange)" text-anchor="middle" dominant-baseline="central" font-family="monospace">{}</text>
 
     <!-- Engranaje exterior: cubos distribuidos en círculo -->
 
-    <!-- Cubo superior -->
-    <g transform="translate(0, -65)">
+    <!-- Cubo superior (90°): radio 80 -->
+    <g transform="translate(0, -80)">
       <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
     </g>
 
-    <!-- Cubo superior derecha (45°) -->
-    <g transform="translate(46, -46)">
+    <!-- Cubo superior derecha (45°): radio 80 -->
+    <g transform="translate(57, -57)">
       <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
     </g>
 
-    <!-- Cubo derecha -->
-    <g transform="translate(65, 0)">
+    <!-- Cubo derecha (0°): radio 80 -->
+    <g transform="translate(80, 0)">
       <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
     </g>
 
-    <!-- Cubo inferior derecha (45°) -->
-    <g transform="translate(46, 46)">
+    <!-- Cubo inferior derecha (-45°): radio 80 -->
+    <g transform="translate(57, 57)">
       <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
     </g>
 
-    <!-- Cubo inferior -->
-    <g transform="translate(0, 65)">
+    <!-- Cubo inferior (-90°): radio 80 -->
+    <g transform="translate(0, 80)">
       <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
     </g>
 
-    <!-- Cubo inferior izquierda (45°) -->
-    <g transform="translate(-46, 46)">
+    <!-- Cubo inferior izquierda (-135°): radio 80 -->
+    <g transform="translate(-57, 57)">
       <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
     </g>
 
-    <!-- Cubo izquierda -->
-    <g transform="translate(-65, 0)">
+    <!-- Cubo izquierda (-180°): radio 80 -->
+    <g transform="translate(-80, 0)">
       <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
     </g>
 
-    <!-- Cubo superior izquierda (45°) -->
-    <g transform="translate(-46, -46)">
+    <!-- Cubo superior izquierda (135°): radio 80 -->
+    <g transform="translate(-57, -57)">
       <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
       <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
       <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
@@ -73,6 +73,6 @@
   </g>
 
   <!-- Círculo decorativo alrededor del engranaje -->
-  <circle cx="128" cy="128" r="100" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
+  <circle cx="115" cy="128" r="125" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
 
 </svg>
