@@ -8,7 +8,7 @@
   </defs>
 
   <!-- Centro: Símbolo {} -->
-  <g transform="translate(115, 128)">
+  <g transform="translate(128, 128)">
     <!-- Llaves de código en el centro -->
     <text x="0" y="0" font-size="48" font-weight="bold" fill="url(#gradOrange)" text-anchor="middle" dominant-baseline="central" font-family="monospace">{}</text>
 
@@ -73,6 +73,6 @@
   </g>
 
   <!-- Círculo decorativo alrededor del engranaje -->
-  <circle cx="115" cy="128" r="120" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
+  <circle cx="128" cy="128" r="120" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
 
 </svg>
