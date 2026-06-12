@@ -1,0 +1,78 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <!-- Backend Logo: Cubos modulares formando un engranaje -->
+  <defs>
+    <linearGradient id="gradOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c2410c;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Centro: Símbolo {} -->
+  <g transform="translate(128, 128)">
+    <!-- Llaves de código en el centro -->
+    <text x="0" y="0" font-size="48" font-weight="bold" fill="url(#gradOrange)" text-anchor="middle" dominant-baseline="central" font-family="monospace">{}</text>
+
+    <!-- Engranaje exterior: cubos distribuidos en círculo -->
+
+    <!-- Cubo superior -->
+    <g transform="translate(0, -65)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+    </g>
+
+    <!-- Cubo superior derecha (45°) -->
+    <g transform="translate(46, -46)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+    </g>
+
+    <!-- Cubo derecha -->
+    <g transform="translate(65, 0)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#f97316" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.8"/>
+    </g>
+
+    <!-- Cubo inferior derecha (45°) -->
+    <g transform="translate(46, 46)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
+    </g>
+
+    <!-- Cubo inferior -->
+    <g transform="translate(0, 65)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#ea580c" opacity="0.85"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#f97316" opacity="0.6"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#c2410c" opacity="0.75"/>
+    </g>
+
+    <!-- Cubo inferior izquierda (45°) -->
+    <g transform="translate(-46, 46)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+    </g>
+
+    <!-- Cubo izquierda -->
+    <g transform="translate(-65, 0)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+    </g>
+
+    <!-- Cubo superior izquierda (45°) -->
+    <g transform="translate(-46, -46)">
+      <rect x="-16" y="-16" width="32" height="32" fill="#c2410c" opacity="0.9"/>
+      <polygon points="-16,-16 -1,-28 31,-28 16,-16" fill="#ea580c" opacity="0.7"/>
+      <polygon points="16,-16 31,-28 31,16 16,28" fill="#f97316" opacity="0.6"/>
+    </g>
+
+  </g>
+
+  <!-- Círculo decorativo alrededor del engranaje -->
+  <circle cx="128" cy="128" r="100" fill="none" stroke="url(#gradOrange)" stroke-width="2" opacity="0.3"/>
+
+</svg>

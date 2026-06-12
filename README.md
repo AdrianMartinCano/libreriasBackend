@@ -1,5 +1,7 @@
 # Shared Backend Libraries — Java/Spring Boot
 
+![Backend Logo](./logo.svg)
+
 Librería multi-módulo Maven de **componentes Spring Boot reutilizables** para construir APIs REST profesionales.
 
 Incluye autenticación JWT, gestión de usuarios, e-commerce, CMS, reservas, almacenamiento y más.
