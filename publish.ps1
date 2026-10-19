@@ -1,42 +1,11 @@
-# ==============================================================================
-# publish.ps1 — Automática de versionado y publicación en GitHub Packages
-# ==============================================================================
+# publish.ps1 — Sube la version y publica modulos Spring Boot a GitHub Packages Maven
 #
-# Este script automatiza todo el proceso de publicación de módulos Spring Boot
-# a GitHub Packages (Maven registry). Maneja dos modos:
-#
-# 1. MODO LOCAL (default):
-#    - Incrementa versión en pom.xml (patch/minor/major)
-#    - Ejecuta: mvn deploy (desde tu ordenador)
-#    - Requiere: Maven + GitHub token en settings.xml
-#
-# 2. MODO CI (-CI flag):
-#    - Incrementa versión en pom.xml
-#    - Crea commit + tag (v1.0.0, v1.0.1, etc.)
-#    - Hace push del tag a GitHub
-#    - GitHub Actions se dispara automáticamente y publica
-#
-# ==============================================================================
-# EJEMPLOS DE USO:
-# ==============================================================================
-#
-#   .\publish.ps1
-#   → Modo local, versión patch (1.0.0 -> 1.0.1)
-#   → Ejecuta: mvn deploy en tu ordenador
-#   → Todos los módulos
-#
-#   .\publish.ps1 minor
-#   → Modo local, versión minor (1.0.0 -> 1.1.0)
-#
-#   .\publish.ps1 patch -CI
-#   → Modo CI, versión patch
-#   → Crea tag v1.0.1 y GitHub Actions publica
-#
-#   .\publish.ps1 patch emails,cms
-#   → Modo local, solo módulos "emails" y "cms"
-#   → Los otros módulos no se publican
-#
-# ==============================================================================
+# Modos de uso:
+#   .\publish.ps1              -> patch local:  sube 1.0.0->1.0.1, mvn deploy en esta maquina
+#   .\publish.ps1 minor        -> minor local
+#   .\publish.ps1 patch -CI    -> patch + CI:   sube version, crea tag, GitHub Actions publica
+#   .\publish.ps1 minor -CI    -> minor + CI
+#   .\publish.ps1 patch emails,cms -> solo esos modulos (solo modo local)
 
 param(
     [ValidateSet("patch","minor","major")]
@@ -47,7 +16,23 @@ param(
 
 Set-Location $PSScriptRoot
 
-$allModules = @("common","security","users","products","ecommerce","storage","cms","reservations","emails")
+# Los modulos salen del <modules> del POM padre, no de una lista escrita aqui.
+#
+# La lista a mano se olvidaba al anadir un modulo, y el fallo NO era "no se publica": era
+# que su <parent><version> se quedaba sin actualizar mientras el resto subia, asi que
+# seguia compilando contra la version anterior de sus dependencias sin que nada avisara.
+# Pasó al anadir `google`. Ahora hay un unico sitio donde se declaran los modulos.
+if (-not (Test-Path "pom.xml")) {
+    Write-Error "No se encontro pom.xml. Ejecuta el script desde la raiz del proyecto."
+    exit 1
+}
+[xml]$pomModulos = Get-Content "pom.xml" -Raw
+$allModules = @($pomModulos.project.modules.module)
+
+if ($allModules.Count -eq 0) {
+    Write-Error "El pom.xml padre no declara ningun <module>."
+    exit 1
+}
 
 if ($Only -and -not $CI) {
     $targetModules = $Only -split "," | ForEach-Object { $_.Trim() }
@@ -61,11 +46,6 @@ if ($Only -and -not $CI) {
 }
 
 # Leer version actual del POM padre
-if (-not (Test-Path "pom.xml")) {
-    Write-Error "No se encontro pom.xml. Ejecuta el script desde la raiz del proyecto."
-    exit 1
-}
-
 [xml]$pom = Get-Content "pom.xml"
 $currentVersion = $pom.project.version
 
@@ -94,7 +74,7 @@ if ($CI) {
     Write-Host "  Modo    : CI - GitHub Actions publicara tras el push del tag" -ForegroundColor Magenta
     Write-Host "  Modulos : todos" -ForegroundColor Cyan
 } else {
-    Write-Host "  Modo    : local - mvn deploy en tu ordenador" -ForegroundColor Cyan
+    Write-Host "  Modo    : local - mvn deploy en esta maquina" -ForegroundColor Cyan
     Write-Host "  Modulos : $($targetModules -join ', ')" -ForegroundColor Cyan
 }
 Write-Host "  Version : $currentVersion  ->  $newVersion  ($BumpType)" -ForegroundColor Yellow
@@ -136,8 +116,9 @@ if ($CI) {
     if ($LASTEXITCODE -ne 0) { Write-Error "git tag fallo."; exit 1 }
 
     git push
-    git push --tags
     if ($LASTEXITCODE -ne 0) { Write-Error "git push fallo."; exit 1 }
+    git push origin "v$newVersion"   # solo el tag nuevo (--tags empujaba tags viejos y fallaba)
+    if ($LASTEXITCODE -ne 0) { Write-Error "git push del tag v$newVersion fallo."; exit 1 }
 
     Write-Host ""
     Write-Host "OK Tag v$newVersion pusheado. GitHub Actions publicara los modulos en unos minutos." -ForegroundColor Green

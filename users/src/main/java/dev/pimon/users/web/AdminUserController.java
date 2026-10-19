@@ -4,12 +4,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import dev.pimon.common.dto.ApiResponse;
 import dev.pimon.common.dto.PageResponse;
+import dev.pimon.users.dto.AdminCreateUserRequest;
 import dev.pimon.users.dto.AdminUpdateUserRequest;
 import dev.pimon.users.dto.UserDto;
 import dev.pimon.users.service.UserService;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -36,6 +38,14 @@ public class AdminUserController {
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<UserDto>> get(@PathVariable String id) {
         return ResponseEntity.ok(ApiResponse.ok(userService.getById(id)));
+    }
+
+    /** POST /api/admin/users — alta de usuario por el admin (p. ej. cuenta de un trabajador). */
+    @PostMapping
+    public ResponseEntity<ApiResponse<UserDto>> create(
+            @Valid @RequestBody AdminCreateUserRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.ok(userService.adminCreate(request), "Usuario creado correctamente"));
     }
 
     /** PUT /api/admin/users/{id} — actualizar nombre, roles y estado */

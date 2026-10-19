@@ -14,10 +14,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -37,7 +37,11 @@ jobs:
           </settings>
           EOF
 
+      # Sin --pl: se despliega el reactor entero, o sea los <module> del POM padre.
+      # Antes iba con una lista de módulos escrita aquí, que había que acordarse de
+      # ampliar al añadir uno. Al olvidarlo, el módulo nuevo no se publicaba y quien
+      # lo pusiera en su pom se encontraba un 404 de GitHub Packages.
       - name: Deploy to GitHub Packages
-        run: mvn deploy -DskipTests --pl common,security,users,products,ecommerce,storage,cms,reservations,emails,newsletter --am
+        run: mvn deploy -DskipTests
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -7,9 +7,11 @@ package dev.pimon.users.entity;
  *   ROLE_USER   → usuario estándar (acceso a su propio perfil y recursos)
  *   ROLE_ADMIN  → administrador (acceso total)
  *   ROLE_EDITOR → puede gestionar contenido pero no usuarios
+ *   ROLE_STAFF  → trabajador: solo ve/gestiona su propia agenda de reservas
  */
 public enum Role {
     ROLE_USER,
     ROLE_ADMIN,
-    ROLE_EDITOR
+    ROLE_EDITOR,
+    ROLE_STAFF
 }

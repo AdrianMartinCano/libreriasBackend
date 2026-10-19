@@ -2,7 +2,6 @@ package dev.pimon.newsletter.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -21,7 +20,9 @@ public class NewsletterCampaign extends BaseEntity {
     @Column(nullable = false)
     private String subject;
 
-    @Lob
+    // Sin @Lob: con Postgres, @Lob sobre String trata la columna como Large Object (oid) y
+    // exige transacción al leerla ("Large Objects may not be used in auto-commit mode").
+    // La columna ya es TEXT, así que se mapea como string normal.
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 

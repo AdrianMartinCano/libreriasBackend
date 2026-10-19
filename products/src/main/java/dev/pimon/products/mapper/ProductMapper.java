@@ -5,6 +5,9 @@ import dev.pimon.products.dto.ProductDto;
 import dev.pimon.products.entity.Category;
 import dev.pimon.products.entity.Product;
 
+import java.util.List;
+import java.util.Set;
+
 public class ProductMapper {
 
     private ProductMapper() {}
@@ -27,8 +30,23 @@ public class ProductMapper {
                 p.isInStock(),
                 p.getImageUrl(),
                 p.getBadge(),
-                p.getCategory() != null ? toCategoryDto(p.getCategory()) : null,
+                toCategoryDtos(p.getCategories()),
+                p.isActive(),
                 p.getCreatedAt()
         );
+    }
+
+    /**
+     * Lista vacía y nunca {@code null}, aunque la entidad venga sin colección.
+     *
+     * Un {@code null} aquí obligaría a comprobarlo en cada plantilla que recorra las
+     * categorías, y basta con que se olvide una para que la ficha reviente en el navegador
+     * de un cliente.
+     */
+    private static List<CategoryDto> toCategoryDtos(Set<Category> categorias) {
+        if (categorias == null) {
+            return List.of();
+        }
+        return categorias.stream().map(ProductMapper::toCategoryDto).toList();
     }
 }

@@ -1,0 +1,49 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0          http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.adrianmartincano</groupId>
+    <artifactId>libs-parent</artifactId>
+    <version>0.12.5</version>
+  </parent>
+  <artifactId>spring-dining</artifactId>
+  <name>Spring Dining</name>
+  <description>Reservas de mesa para bar/restaurante: zonas, mesas (aforo en comensales), turnos y asignación de mesas (bin-packing) con control de concurrencia.</description>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <!-- Módulo de seguridad de pimon: AuthUser/@CurrentUser para el scoping de roles. -->
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+    <!-- Confirmaciones por email (deshabilitable con libui.email.enabled: false). -->
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-emails</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <optional>true</optional>
+    </dependency>
+  </dependencies>
+</project>

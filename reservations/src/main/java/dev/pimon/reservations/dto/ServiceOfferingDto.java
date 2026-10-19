@@ -11,12 +11,13 @@ public record ServiceOfferingDto(
         int        durationMinutes,
         BigDecimal price,
         String     imageUrl,
-        String     color
+        String     color,
+        boolean    active
 ) {
     public static ServiceOfferingDto from(ServiceOffering s) {
         return new ServiceOfferingDto(
                 s.getId(), s.getName(), s.getDescription(),
-                s.getDurationMinutes(), s.getPrice(), s.getImageUrl(), s.getColor()
+                s.getDurationMinutes(), s.getPrice(), s.getImageUrl(), s.getColor(), s.isActive()
         );
     }
 }

@@ -1,16 +1,12 @@
-# Shared Backend Libraries — Java/Spring Boot
+# Librerías Spring Boot — multi-módulo Maven
 
-![Backend Logo](./logo.svg)
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 
-Librería multi-módulo Maven de **componentes Spring Boot reutilizables** para construir APIs REST profesionales.
+**17 módulos Spring Boot reutilizables** para montar APIs REST de negocio (tiendas, reservas, restauración, CMS, blog, foro, newsletter...) sin reescribir lo mismo en cada proyecto. Publicados en GitHub Packages bajo el groupId `io.github.adrianmartincano`.
 
-Incluye autenticación JWT, gestión de usuarios, e-commerce, CMS, reservas, almacenamiento y más.
+**Stack:** Java 21 · Spring Boot 3.4 · Maven multi-módulo · JPA/Hibernate · JWT · Thymeleaf
 
-**Stack:** Java 21+ · Spring Boot 3.4+ · Maven multi-módulo · JPA/Hibernate · JWT · Thymeleaf
-
-Publicados en GitHub Packages bajo el groupId `io.github.adrianmartincano`.
-
-**Frontend companion:** [`librerias-frontend`](https://github.com/AdrianMartinCano/librerias-frontend) — librerías Angular compartidas
+Su contraparte frontend (librerías Angular) vive en [`librerias-frontend`](https://github.com/AdrianMartinCano/librerias-frontend).
 
 ---
 
@@ -20,18 +16,23 @@ Publicados en GitHub Packages bajo el groupId `io.github.adrianmartincano`.
 |---|---|---|
 | `spring-common` | `dev.pimon.common` | `ApiResponse`, `AppException`, manejo global de errores, entidad base |
 | `spring-security` | `dev.pimon.security` | JWT, Spring Security, rutas públicas configurables, CORS, `@CurrentUser` |
-| `spring-users` | `dev.pimon.users` | Registro, login, perfil, roles ADMIN/USER, admin por defecto |
+| `spring-users` | `dev.pimon.users` | Registro, login, perfil, roles ADMIN/USER, admin por defecto, recuperar contraseña |
+| `spring-google` | `dev.pimon.google` | **Entrar con Google** (Google Identity Services): verifica el `id_token`, vincula o crea la cuenta y devuelve el mismo JWT que el login normal. **Apagado por defecto**: sin `pimon.google.habilitado=true` no carga ni endpoints ni tabla |
 | `spring-products` | `dev.pimon.products` | Catálogo con categorías, filtros, paginación, slug y soft delete |
 | `spring-ecommerce` | `dev.pimon.ecommerce` | Pedidos, checkout, Stripe opcional, webhook |
+| `spring-blog` | `dev.pimon.blog` | Blog: posts cronológicos (admin escribe, público lee) y comentarios de usuarios registrados, con nick en vivo |
+| `spring-forum` | `dev.pimon.forum` | Foro de comunidad: categorías (admin), hilos y mensajes de usuarios, reacciones, citas, notificaciones, búsqueda y moderación (fijar/cerrar/mover/denuncias) |
 | `spring-storage` | `dev.pimon.storage` | Subida de archivos local/S3, conversión automática a WebP |
 | `spring-cms` | `dev.pimon.cms` | Páginas con bloques JSON, publicación, API pública + admin |
-| `spring-reservations` | `dev.pimon.reservations` | Servicios, disponibilidad, reservas con confirmación por email |
+| `spring-reservations` | `dev.pimon.reservations` | Servicios, disponibilidad, reservas con confirmación por email; **multistaff** (varios profesionales con agenda propia, asignación "cualquiera", scoping ROLE_STAFF) |
+| `spring-dining` | `dev.pimon.dining` | Reservas de mesa para bar/restaurante: zonas, mesas (aforo en comensales), turnos y **asignación de mesa best-fit + combinación** con control de concurrencia |
+| `spring-menu` | `dev.pimon.menu` | Carta (categorías, platos con alérgenos/raciones) y **menú del día** publicable/clonable, con presentación tipográfica configurable. Sin imágenes subidas |
 | `spring-emails` | `dev.pimon.email` | Envío SMTP, plantillas Thymeleaf con marca configurable (colores, logo) |
 | `spring-newsletter` | `dev.pimon.newsletter` | Suscripciones doble opt-in, campañas con plantillas, confirm/unsubscribe |
+| `spring-fx` | `dev.pimon.fx` | Tasas de cambio por API (`/api/fx`), refresco automático opcional; alimenta el formateo multi-divisa del front |
+| `spring-events` | `dev.pimon.events` | Webs de eventos: confirmaciones de asistencia (RSVP) y su resumen para el organizador |
 
 La documentación completa de cada módulo (configuración, endpoints, ejemplos) está en [docs/backend.md](docs/backend.md).
-
-📖 **[PUBLISHING.md](./PUBLISHING.md)** — Guía completa: cómo publicar en GitHub Packages (Maven)
 
 ---
 
@@ -56,12 +57,12 @@ La documentación completa de cada módulo (configuración, endpoints, ejemplos)
 <dependency>
   <groupId>io.github.adrianmartincano</groupId>
   <artifactId>spring-security</artifactId>
-  <version>1.1.12</version>
+  <version>1.0.0</version>
 </dependency>
 <dependency>
   <groupId>io.github.adrianmartincano</groupId>
   <artifactId>spring-users</artifactId>
-  <version>1.1.12</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
@@ -70,7 +71,7 @@ La documentación completa de cada módulo (configuración, endpoints, ejemplos)
 ```yaml
 pimon:
   security:
-    jwt-secret: "secreto-de-al-menos-32-caracteres"
+    jwt-secret: "secreto-de-al-menos-32-caracteres"   # mín. 32 chars (la app no arranca si es menor)
     public-paths: ["/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**"]
     cors:
       allowed-origins: ["http://localhost:4200"]
@@ -90,9 +91,13 @@ Ejemplo real de proyecto consumidor: `girandoMaderaBack` (tienda Girando Madera)
 
 ```bash
 # Compilar e instalar todo en el repo local de Maven
+
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 mvn clean install -DskipTests
 
 # Compilar un módulo concreto (con sus dependencias)
+
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 mvn clean install -pl newsletter -am -DskipTests
 ```
 
@@ -100,13 +105,20 @@ mvn clean install -pl newsletter -am -DskipTests
 
 ## Publicar una nueva versión
 
-El CI (GitHub Actions) publica los 10 módulos al pushear un tag `v*`:
+El CI (GitHub Actions) publica los módulos al pushear un tag `v*`:
 
 ```bash
-# 1. Sube la versión en el pom.xml raíz y en el <parent><version> de los 10 módulos
+# 1. Sube la versión en el pom.xml raíz y en el <parent><version> de cada módulo
+
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
+#    (lo hace publish.ps1, que lee la lista de módulos del propio pom padre)
+
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 # 2. Commit + tag + push
-git commit -am "chore: bump version to 1.1.13"
-git tag v1.1.13
+
+> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
+git commit -am "chore: bump version to 1.0.0"
+git tag v1.0.0
 git push && git push --tags
 ```
 
@@ -120,12 +132,19 @@ librerias-backend/
 ├── common/          ← spring-common
 ├── security/        ← spring-security
 ├── users/           ← spring-users
+├── google/          ← spring-google
 ├── products/        ← spring-products
 ├── ecommerce/       ← spring-ecommerce
+├── blog/            ← spring-blog
+├── forum/           ← spring-forum
 ├── storage/         ← spring-storage
 ├── cms/             ← spring-cms
 ├── reservations/    ← spring-reservations
+├── dining/          ← spring-dining
+├── menu/            ← spring-menu
 ├── emails/          ← spring-emails
 ├── newsletter/      ← spring-newsletter
+├── fx/              ← spring-fx
+├── events/          ← spring-events
 └── docs/            ← documentación completa de los módulos
 ```

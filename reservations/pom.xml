@@ -4,7 +4,7 @@
   <parent>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>libs-parent</artifactId>
-    <version>1.1.12</version>
+    <version>0.12.5</version>
   </parent>
   <artifactId>spring-reservations</artifactId>
   <name>Spring Reservations</name>
@@ -26,11 +26,16 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-security</artifactId>
     </dependency>
+    <!-- M�dulo de seguridad de pimon: AuthUser/@CurrentUser para el scoping de ROLE_STAFF. -->
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-security</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
     </dependency>
-    <!-- reservations siempre envÃ­a confirmaciones por email; para deshabilitar: libui.email.enabled: false -->
+    <!-- reservations siempre envía confirmaciones por email; para deshabilitar: libui.email.enabled: false -->
     <dependency>
       <groupId>io.github.adrianmartincano</groupId>
       <artifactId>spring-emails</artifactId>

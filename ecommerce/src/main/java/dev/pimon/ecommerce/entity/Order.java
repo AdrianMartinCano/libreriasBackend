@@ -5,12 +5,18 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import dev.pimon.common.entity.BaseEntity;
+import org.hibernate.annotations.BatchSize;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+        // myOrders() filtra por userId; el webhook busca por stripe_payment_intent_id en cada evento.
+        @Index(name = "idx_order_user", columnList = "userId"),
+        @Index(name = "idx_order_payment_intent", columnList = "stripePaymentIntentId")
+})
 @Getter @Setter @NoArgsConstructor
 public class Order extends BaseEntity {
 
@@ -20,11 +26,19 @@ public class Order extends BaseEntity {
     @Column(nullable = false)
     private String userEmail;
 
+    // @BatchSize evita el N+1 al listar pedidos: carga los ítems de varios pedidos
+    // en pocas consultas "... IN (?, ?, ...)" en lugar de una por pedido.
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     private List<OrderItem> items = new ArrayList<>();
 
-    @Column(nullable = false)
-    private Double total;
+    /** Gastos de envío incluidos en el total. */
+    @Column(precision = 12, scale = 2)
+    private BigDecimal shippingCost = BigDecimal.ZERO;
+
+    /** Total cobrado = subtotal de artículos + envío. */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal total;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

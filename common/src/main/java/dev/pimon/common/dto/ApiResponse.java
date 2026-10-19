@@ -24,6 +24,7 @@ public class ApiResponse<T> {
 
     private boolean success;
     private String  message;
+    private String  code;     // código de error estable para el cliente (p. ej. "NOT_FOUND"); omitido si es null
     private T       data;
     private Object  errors;
 
@@ -60,6 +61,16 @@ public class ApiResponse<T> {
         return ApiResponse.<T>builder()
                 .success(false)
                 .message(message)
+                .errors(errors)
+                .build();
+    }
+
+    /** Error con código estable (lo usa GlobalExceptionHandler para propagar AppException.code). */
+    public static <T> ApiResponse<T> error(String message, String code, Object errors) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .code(code)
                 .errors(errors)
                 .build();
     }

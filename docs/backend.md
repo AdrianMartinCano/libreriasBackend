@@ -27,11 +27,18 @@ librerias-backend/
   users/               ← Registro, perfil, roles ADMIN/USER            → paquete: dev.pimon.users
   products/            ← Catálogo: productos y categorías              → paquete: dev.pimon.products
   ecommerce/           ← Pedidos y pagos con Stripe                   → paquete: dev.pimon.ecommerce
+  blog/                ← Blog: posts + comentarios                    → paquete: dev.pimon.blog
+  forum/               ← Foro: categorías, hilos, mensajes            → paquete: dev.pimon.forum
   storage/             ← Subida de imágenes a disco, conversión WebP  → paquete: dev.pimon.storage
   cms/                 ← Páginas CMS con bloques JSON                 → paquete: dev.pimon.cms
-  reservations/        ← Servicios, disponibilidad y reservas          → paquete: dev.pimon.reservations
+  reservations/        ← Servicios, disponibilidad y reservas (citas)  → paquete: dev.pimon.reservations
+  dining/              ← Reservas de mesa: zonas, mesas, turnos        → paquete: dev.pimon.dining
+  menu/                ← Carta y menú del día (sin imágenes)           → paquete: dev.pimon.menu
   emails/              ← Emails HTML con Thymeleaf, marca configurable → paquete: dev.pimon.email
   newsletter/          ← Suscripciones doble opt-in y campañas         → paquete: dev.pimon.newsletter
+  google/              ← Entrar con Google (apagado por defecto)       → paquete: dev.pimon.google
+  fx/                  ← Tasas de cambio para el front multi-divisa    → paquete: dev.pimon.fx
+  events/              ← Webs de eventos: RSVP y resumen               → paquete: dev.pimon.events
 ```
 
 ---
@@ -59,12 +66,12 @@ para la guía completa. El resumen rápido:
 <dependency>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>spring-security</artifactId>
-    <version>1.0.5</version>
+    <version>0.0.1</version>
 </dependency>
 <dependency>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>spring-users</artifactId>
-    <version>1.0.5</version>
+    <version>0.0.1</version>
 </dependency>
 <!-- Solo los módulos que necesites -->
 ```
@@ -94,7 +101,7 @@ spring:
 
 pimon:
   security:
-    jwt-secret: "mi-secreto-de-al-menos-32-caracteres-aqui"   # ⚠️ OBLIGATORIO cambiar en producción
+    jwt-secret: "mi-secreto-de-al-menos-32-caracteres-aqui"   # ⚠️ mín. 32 caracteres; la app NO arranca si es más corto, y avisa si usas el de por defecto
     access-token-expiration: 86400000   # 24 horas en ms
     public-paths:
       - "/api/auth/**"
@@ -146,6 +153,7 @@ pimon:
     work-end: "20:00"
     work-days: [TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY]
     slot-interval-minutes: 60
+    capacity: 1                # reservas que pueden solaparse a la vez (recursos en paralelo)
 
 # spring.mail se añade bajo la misma clave spring: del bloque anterior
 spring:
@@ -200,14 +208,21 @@ spring-common
 spring-security   spring-storage
    ↑                 ↑
 spring-users      spring-cms     spring-emails
-   ↑                               ↑
-spring-products               spring-reservations
+   ↑    ↑                          ↑
+   |    spring-google    spring-reservations   spring-dining   spring-menu
+spring-products
    ↑
 spring-ecommerce
 ```
 
 - `spring-ecommerce` depende de `spring-products` para validar stock al crear un pedido.
+- `spring-google` depende de `spring-users` (la cuenta que vincula o crea) y de `spring-security` (el JWT que emite). Va en módulo aparte y no dentro de ninguno de los dos por dos motivos: `spring-security` **no tiene JPA** y el vínculo necesita tabla, y meterlo en `spring-users` obligaría a **todas** las webs a tener `cuentas_google` —su autoconfiguración registra el paquete entero en JPA— aunque no usen Google.
 - `spring-reservations` depende de `spring-emails` para enviar confirmaciones automáticamente al crear o actualizar una reserva. Para deshabilitar el envío sin quitar la dependencia: `pimon.email.enabled: false`.
+- `spring-dining` depende de `spring-emails` por consistencia con el patrón de reservas (el envío de confirmaciones lo cablea la app consumidora; el servicio no lo acopla).
+- `spring-menu` solo depende de `spring-common` y `spring-security` — **no** usa `spring-storage` (carta sin imágenes subidas) ni `spring-products`.
+- `spring-blog` y `spring-forum` dependen de `spring-common` y `spring-security` (el autor sale del JWT).
+- `spring-newsletter` depende de `spring-emails` (confirmaciones doble opt-in y envío de campañas).
+- `spring-fx` y `spring-events` solo dependen de `spring-common`.
 
 ---
 
@@ -268,14 +283,20 @@ JSON de éxito:
 }
 ```
 
-JSON de error:
+JSON de error (incluye `code`, un código estable para que el frontend ramifique sin depender del texto):
 
 ```json
 {
   "success": false,
-  "message": "Producto no encontrado: silla-nordica"
+  "message": "Producto no encontrado: silla-nordica",
+  "code": "NOT_FOUND"
 }
 ```
+
+> El campo `code` es opcional (`@JsonInclude(NON_NULL)`): solo aparece en errores. Lo rellena el
+> `GlobalExceptionHandler` con el `code` del `AppException` o con un código fijo por tipo de error
+> (`VALIDATION_ERROR`, `DATA_CONFLICT`, `MALFORMED_REQUEST`, `FILE_TOO_LARGE`, `UNAUTHENTICATED`,
+> `ACCESS_DENIED`…).
 
 JSON de error de validación (con mapa de campos):
 
@@ -283,6 +304,7 @@ JSON de error de validación (con mapa de campos):
 {
   "success": false,
   "message": "Error de validación",
+  "code": "VALIDATION_ERROR",
   "errors": {
     "email": "El email no es válido",
     "password": "Debe tener al menos 6 caracteres"
@@ -344,13 +366,44 @@ Se registra automáticamente. Captura y transforma en `ApiResponse` los siguient
 
 | Excepción | Código HTTP | Qué dispara |
 |---|---|---|
-| `AppException` | El del `AppException` | Cualquier `throw AppException.*()` en el código |
+| `AppException` | El del `AppException` | Cualquier `throw AppException.*()` en el código (propaga su `code`) |
 | `MethodArgumentNotValidException` | 400 | Fallo de `@Valid` en un `@RequestBody` |
+| `ConstraintViolationException` | 400 | Fallo de `@Validated` en `@PathVariable`/`@RequestParam` |
+| `MissingServletRequestParameterException` | 400 | Falta un query param obligatorio |
 | `MethodArgumentTypeMismatchException` | 400 | Parámetro de URL con tipo incorrecto (ej. texto donde se espera UUID) |
+| `HttpMessageNotReadableException` | 400 | Cuerpo JSON ausente o mal formado |
+| `DataIntegrityViolationException` | 409 | Conflicto de integridad en BD (unique/FK/not-null); el detalle se loguea pero **no** se expone |
+| `MaxUploadSizeExceededException` | 413 | Archivo subido por encima del límite |
 | `NoResourceFoundException` | 404 | Archivo estático no encontrado (`/uploads/...`) |
 | `Exception` | 500 | Cualquier otro error no controlado |
 
 En el caso de validación devuelve además el mapa de errores por campo (ver `ApiResponse` arriba).
+Todas las respuestas de error incluyen el campo `code`.
+
+---
+
+## Configuración editable en caliente (`app_settings`)
+
+Ajustes de **negocio** que el administrador cambia desde el panel **sin reiniciar** (a diferencia de
+`application.yml`, que es de dev/ops). Viven en la tabla `app_settings`, **una fila por módulo**, con
+el valor como **JSON**. `application.yml` aporta los **defaults/semilla**; la fila de BD es el valor vivo.
+
+- Mecanismo genérico: `dev.pimon.common.settings.SettingsStore` (cacheado en memoria; cae a defaults si
+  no hay fila). `store.get(key, Pojo.class, defaults)` / `store.save(key, pojo)`.
+- **Nunca** secretos ni *bootstrap* en esta tabla. Caché por nodo → en multi-instancia usar `evict(...)`.
+
+| Módulo | Ajustes | Endpoints (ADMIN) |
+|---|---|---|
+| `reservations` | **horario por día con turnos partidos** (`weeklyHours`), intervalo, `capacity` y **`blockedDates`** (vacaciones/festivos) | `GET/PUT /api/admin/reservations/settings` |
+| `dining` | aforo total por turno (`totalCapacity`), antelación mín/máx y **`blockedDates`** (días cerrados) | `GET/PUT /api/admin/dining/settings` |
+| `menu` | **presentación**: fuentes (whitelist), color de acento, layout, moneda, mostrar precios/alérgenos | `GET/PUT /api/admin/menu/presentation` |
+
+`AvailabilityService`/`BookingService` leen estos ajustes: horario **por día** con **varios tramos**
+(turno partido); día sin tramos = cerrado; fecha en `blockedDates` (vacaciones) = sin reservas. Todo
+en caliente, sin reiniciar. `application.yml` aporta el horario por defecto (cada día laborable con un
+tramo `work-start`–`work-end`). Añadir un ajuste = añadir un campo al POJO (sin migración, JSON).
+**Decisión:** lo usan los módulos donde el dueño cambia cosas a menudo (reservas, restauración, carta);
+el mecanismo es genérico y cualquier módulo puede engancharse añadiendo un POJO de ajustes.
 
 ---
 
@@ -770,6 +823,144 @@ pimon:
 
 ---
 
+## `spring-google` — Entrar con Google
+
+**ArtifactId:** `spring-google`  
+**Paquete:** `dev.pimon.google`  
+**Depende de:** `spring-common`, `spring-security`, `spring-users`
+
+Login con **Google Identity Services**: el navegador consigue un `id_token`, lo manda aquí, y
+a cambio recibe **el mismo JWT que emite `/api/auth/login`**. A partir de ahí todo funciona
+igual: no hay nada que refrescar contra Google y la caducidad de sesión es la tuya.
+
+### Apagado por defecto, y eso importa
+
+```yaml
+pimon:
+  google:
+    habilitado: true                                   # por defecto false
+    client-id: 123-miweb.apps.googleusercontent.com    # obligatorio si habilitado
+```
+
+Con `habilitado: false` **la autoconfiguración no carga nada**: ni el endpoint, ni el
+decodificador, ni la entidad JPA. Es deliberado y tiene dos consecuencias buenas:
+
+- Una aplicación con `ddl-auto: validate` **no exige la tabla** `cuentas_google` mientras no
+  encienda Google.
+- `GET /api/auth/google/config` responde **404**, que el front debe leer como «aquí no hay
+  login con Google» y no pintar el botón.
+
+Si lo enciendes **sin `client-id`, la aplicación no arranca** (`@NotBlank`). Es a propósito:
+sin client-id no se puede comprobar el `aud`, y sin esa comprobación el login con Google es
+una puerta trasera al login normal.
+
+### Endpoints
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/auth/google/config` | El `client_id` con el que pintar el botón |
+| `POST` | `/api/auth/google` | Cambia el `id_token` por una sesión (`LoginResponse`) |
+| `GET` | `/api/auth/google/vinculada` | Si **tu** cuenta entró por Google (requiere sesión) |
+
+> ⚠️ Añade `/api/auth/google` a tus `public-paths` de `spring-security`, o el login
+> responderá 401 antes de llegar al controlador.
+
+El cuerpo del POST es `{ "credential": "<id_token>" }` — se llama `credential` porque es el
+nombre exacto del campo que devuelve la librería de Google en el front; renombrarlo aquí solo
+añadiría una traducción que hay que recordar en los dos lados.
+
+### Las cuatro comprobaciones del token
+
+`VerificadorTokenGoogle` es **la clase que sostiene todo esto**. Un `id_token` es solo un JWT:
+aceptarlo sin verificar del todo permite que cualquiera se fabrique uno con el correo de otra
+persona.
+
+1. **Firma** — que lo emitió Google, contra sus claves públicas.
+2. **Caducidad** — un token robado deja de valer en una hora.
+3. **`aud` = tu `client-id`** — que ese token se emitió *para tu aplicación*. Sin esto valdría
+   uno emitido para cualquier otra web que use Google.
+4. **`email_verified` = true** — protege las cuentas que **ya existen**: la vinculación es por
+   correo, así que aceptar uno sin verificar permitiría apropiarse de la cuenta de alguien
+   registrado con contraseña.
+
+Las cuatro son obligatorias. Quitar cualquiera convierte el endpoint en un agujero. Los
+rechazos **siempre devuelven el mismo mensaje**: distinguir «caducado» de «no es para esta
+app» solo le sirve a quien esté probando a ver qué cuela.
+
+### Qué pasa con la cuenta
+
+| Situación | Qué se hace |
+|---|---|
+| Ya había vínculo (por `sub`) | Entra. Si cambió su correo en Google, se actualiza el nuestro |
+| Existe cuenta con ese correo, sin vínculo | **Se vincula** — seguro solo porque ya se exigió `email_verified` |
+| No hay nada | Se crea la cuenta, sin pedir nada más |
+
+**Se busca por `sub`, no por el correo.** El `sub` de Google no cambia nunca; el correo sí.
+Buscando por correo, quien se cambiara la dirección de Gmail acabaría en una cuenta nueva en
+vez de en la suya.
+
+**A las cuentas creadas así se les pone una contraseña imposible**: el hash de 32 bytes
+aleatorios que se tiran sin guardarlos. No es un hueco — no existe ninguna cadena que produzca
+ese hash y que alguien pueda escribir. Quien quiera además una contraseña normal puede pedirla
+por «he olvidado mi contraseña», que le llega al correo que Google acaba de verificar que es
+suyo.
+
+Y una cuenta **dada de baja no entra**, con el mismo criterio que el login normal: si se
+dejara pasar, Google sería la forma de saltarse la baja.
+
+### La migración la escribes tú
+
+Las librerías traen la entidad, **no** las migraciones. Con `ddl-auto: update` la tabla se
+crea sola; con `validate` hace falta este SQL:
+
+```sql
+CREATE TABLE cuentas_google (
+    id              varchar(36)     NOT NULL,
+    created_at      timestamp(6)    NOT NULL,
+    updated_at      timestamp(6)    NOT NULL,
+    user_id         varchar(36)     NOT NULL,
+    -- Identificador de la persona en Google. Estable de por vida.
+    sub             varchar(255)    NOT NULL,
+    -- Con qué dirección se vinculó. Informativo: si cambia en Google, se actualiza.
+    email           varchar(255)    NOT NULL,
+    vinculada_en    timestamp(6)    NOT NULL,
+    CONSTRAINT cuentas_google_pkey PRIMARY KEY (id),
+    -- Un `sub` apunta a una sola cuenta, y una cuenta se vincula con un solo Google. Sin
+    -- estos dos únicos, dos peticiones simultáneas del mismo usuario crearían dos vínculos.
+    CONSTRAINT uk_cuentas_google_sub  UNIQUE (sub),
+    CONSTRAINT uk_cuentas_google_user UNIQUE (user_id),
+    -- Al borrar la cuenta desaparece su vínculo.
+    CONSTRAINT fk_cuentas_google_user FOREIGN KEY (user_id) REFERENCES app_users (id) ON DELETE CASCADE
+);
+```
+
+**Tabla aparte, no una columna en `app_users`**: esa tabla es de `spring-users`, y añadirle
+columnas rompe `ddl-auto: validate` al arrancar porque la entidad de la librería no las
+conocería.
+
+### Lo que se lleva tiempo no es el código
+
+- **La consola de Google**: un cliente OAuth **por dominio**. Sin revisión de Google si los
+  permisos son `openid email profile`.
+- **La CSP**: `script-src`, `frame-src` y `connect-src` con `accounts.google.com`. Si falta
+  uno, **el botón no aparece y el error de consola no dice cuál**.
+
+### Por qué Nimbus y no `google-api-client`
+
+Pesa muchísimo menos y es lo que ya usa Spring Security para decodificar JWT. El decodificador
+se construye con `withJwkSetUri` y **no** con `JwtDecoders.fromIssuerLocation`, aunque la
+segunda sea más corta: esa se conecta a Google **al crear el bean**, o sea al arrancar la
+aplicación, y si Google no contestara —o el arranque fuera sin red, como en los tests— la
+aplicación entera no levantaría por una función secundaria. Con `withJwkSetUri` la primera
+conexión ocurre en el primer login, y Nimbus cachea las claves y las vuelve a pedir cuando
+Google las rota.
+
+El validador acepta **dos emisores** (`https://accounts.google.com` y `accounts.google.com`):
+Google usa una u otra forma según el flujo, las dos son suyas, y el validador de un solo emisor
+que trae Spring no sirve tal cual.
+
+---
+
 ## `spring-products` — Catálogo de productos
 
 **ArtifactId:** `spring-products`  
@@ -799,9 +990,22 @@ products
   image_url      VARCHAR
   badge          VARCHAR                 — "Nuevo", "-25%", "Oferta"...
   active         BOOLEAN DEFAULT true    — false = soft delete
-  category_id    FK → categories.id
   created_at, updated_at
+
+product_categories                        — desde 0.10.0: un producto, VARIAS categorías
+  product_id     FK → products.id        (PK compuesta, ON DELETE CASCADE)
+  category_id    FK → categories.id      (PK compuesta, SIN cascada a propósito:
+                                           borrar una categoría con productos dentro lo
+                                           rechaza CategoryService explicando qué hacer)
 ```
+
+> **Hasta la 0.9.1 era `products.category_id`, una sola categoría.** Cambió porque obliga a
+> elegir: un producto de temporada —un llavero de Halloween— pertenece a su categoría de
+> siempre **y** a la de la campaña, y con una sola, meterlo en la campaña lo saca de la
+> otra. Ver `decisiones/0003-un-producto-puede-estar-en-varias-categorias.md`.
+>
+> Al subir desde una versión anterior hay que **crear la tabla y copiar los datos**:
+> `INSERT INTO product_categories (product_id, category_id) SELECT id, category_id FROM products WHERE category_id IS NOT NULL;`
 
 El `slug` se genera automáticamente de `name` al crear. Si ya existe, añade sufijo:
 `"Silla Nórdica"` → `"silla-nordica"` → `"silla-nordica-2"` si ya existía.
@@ -821,7 +1025,7 @@ GET /api/products/{slug}    → detalle de un producto por su slug
 | Parámetro | Tipo | Descripción |
 |---|---|---|
 | `search` | `string` | Búsqueda en nombre y descripción |
-| `category` | `string` | Slug de la categoría (no el nombre) |
+| `category` | `string` | Slug de la categoría (no el nombre). Devuelve los productos que la tengan **entre** las suyas; la consulta lleva `distinct` porque el join produce una fila por categoría |
 | `minPrice` | `number` | Precio mínimo |
 | `maxPrice` | `number` | Precio máximo |
 | `inStock` | `boolean` | `true` = solo con stock > 0 |
@@ -907,21 +1111,62 @@ Request de creación (`POST /api/admin/products`):
   "stock": 15,
   "imageUrl": "https://miapp.com/uploads/products/silla.webp",
   "badge": "-25%",
-  "categoryId": "uuid-de-la-categoria"
+  "categoryId": "uuid-de-la-categoria",
+  "active": false
 }
 ```
 
 Campos obligatorios en creación: `name` (`@NotBlank`), `description` (`@NotBlank`), `price` (positivo), `stock` (≥ 0), `categoryId` (`@NotBlank`).
+
+#### `active` al crear: prepararlo antes de venderlo
+
+**Omitirlo crea el producto publicado**, que es como se comportaba esto antes de que el campo
+existiera (0.9.0): quien ya llamaba a este endpoint no cambia nada.
+
+Mandar `false` lo crea **oculto al catálogo público**, para poder terminarlo antes de que se
+vea. Hace falta más de lo que parece: en una tienda con datos que cuelgan del producto —fotos,
+medidas, variantes— nada de eso puede existir hasta que el producto está guardado, porque
+todos necesitan su id. Sin este campo, ese rato se pasa con el producto **a la venta y a
+medias**.
+
+> Salió de un caso real en pimon3d: una pieza recién creada aparecía en la tienda sin fotos ni
+> medidas, y ahí sin medidas ni siquiera se le puede calcular el envío — o sea, a la venta sin
+> poder venderse. Su panel mandaba `active: false` y **se ignoraba en silencio**, porque este
+> DTO no tenía el campo.
 
 Request de actualización (`PUT /api/admin/products/{id}`): todos los campos son opcionales — solo se actualizan los enviados.
 
 ### Endpoints de administración de categorías (requiere `ROLE_ADMIN`)
 
 ```
-POST   /api/admin/categories        → crear categoría
+POST   /api/admin/categories        → crear (o recuperar una retirada con ese nombre)
 PUT    /api/admin/categories/{id}   → actualizar
-DELETE /api/admin/categories/{id}   → desactiva (soft delete)
+DELETE /api/admin/categories/{id}   → BORRA de verdad, si no tiene productos dentro
 ```
+
+#### Borrar una categoría (cambió en 0.4.2)
+
+Hasta la 0.4.1, `DELETE` solo ponía `active = false`. Como el panel únicamente pinta las
+activas, **parecía borrada pero seguía ahí ocupando su nombre**: al intentar crearla otra
+vez saltaba «Ya existe una categoría con ese nombre», refiriéndose a algo que no se veía
+por ningún lado. El nombre quedaba quemado sin salida.
+
+Ahora se borra de verdad. Y si tiene productos, **no se borra y se dice por qué**:
+
+```
+No se puede borrar «Figuras»: tiene 3 a la venta y 1 en la papelera.
+Cámbialos de categoría primero.
+```
+
+Los productos apuntan a la categoría con clave ajena, así que borrarla con contenido los
+dejaría colgados. **Cuentan también los de la papelera**, porque se pueden restaurar: si su
+categoría hubiera desaparecido, la restauración devolvería un producto roto. Por eso el
+mensaje los menciona aparte — en la lista de productos no se ven, y sin decirlo el aviso
+parecería equivocado.
+
+`POST` recupera una categoría retirada que tenga ese slug, en vez de rechazar el alta. Es
+lo que arregla las que quedaron desactivadas antes de este cambio: se vuelven a dar de alta
+y reaparecen con los datos nuevos.
 
 Request de creación/actualización:
 
@@ -948,14 +1193,20 @@ automáticamente las imágenes a WebP antes de guardarlas (mejor compresión, mi
 
 ### Flujo interno de una subida
 
-1. Valida tipo MIME y tamaño contra la configuración
-2. Si `webp.enabled = true` y el archivo es una imagen (no SVG):
-   - Guarda el original en un archivo temporal
-   - Ejecuta `cwebp` para convertir a WebP
-   - Si `cwebp` no está disponible, guarda el original sin convertir
-3. Genera un nombre de archivo con UUID para evitar colisiones
-4. Guarda en `upload-dir/subdir/uuid.webp` (o `uuid.ext` si no hay conversión)
-5. Devuelve la URL pública: `base-url/subdir/uuid.webp`
+1. Valida tipo MIME, tamaño y **firma binaria real** (magic bytes) contra la configuración
+2. Si `webp.enabled = true`, el archivo es una imagen (no SVG) **y no es ya WebP**:
+   - Guarda el original en un temporal `uuid-origen.ext`
+   - Ejecuta `cwebp` para convertir a `uuid.webp` y borra el temporal
+   - Si `cwebp` no está disponible, renombra el temporal a `uuid.ext` y lo deja sin convertir
+3. Si el archivo **ya es WebP** (o no es imagen), se guarda tal cual en `uuid.ext`
+4. Devuelve la URL pública: `base-url/subdir/uuid.webp`
+
+> **Lo que ya es WebP no se convierte, y el temporal lleva sufijo `-origen`.** Sin esas dos
+> cosas, subir un `.webp` se rompía: el temporal y el destino caían en el mismo nombre
+> (`uuid.webp`), así que `cwebp` abría el destino para escribir y con eso **vaciaba su
+> propia entrada**; y si aun así devolvía éxito, el borrado del temporal se llevaba por
+> delante el fichero recién escrito. Quedaba una imagen rota o un 404. Y volver a comprimir
+> algo que ya viene comprimido con pérdida solo lo empeora. Arreglado en 0.9.1.
 
 ### Endpoint de subida
 
@@ -1105,17 +1356,25 @@ pimon:
     upload-dir: /var/uploads         # por defecto: ./uploads (relativo al directorio de trabajo)
     base-url: https://miapp.com/uploads  # por defecto: http://localhost:8080/uploads
     max-size-mb: 10
-    allowed-types:
+    allowed-types:                # SVG NO está por defecto (riesgo XSS); añádelo solo si lo necesitas
       - image/jpeg
       - image/png
       - image/gif
       - image/webp
-      - image/svg+xml
+      - image/heic
+      - image/heif
     webp:
       enabled: true
       quality: 85       # 0-100. 85 es un buen equilibrio calidad/tamaño
       cwebp-path: cwebp # ruta al binario. Por defecto busca en el PATH
 ```
+
+> **Seguridad de subidas:**
+> - **Validación por *magic bytes***: además del `Content-Type` (falsificable), se comprueba la firma
+>   binaria real (JPEG/PNG/GIF/WEBP/HEIC). Un archivo que no sea realmente una imagen se rechaza.
+> - **SVG fuera de los tipos por defecto** (riesgo XSS). Si lo añades, los `/uploads` se sirven con
+>   `X-Content-Type-Options: nosniff` y los `.svg` con `Content-Disposition: attachment` (nunca inline).
+> - **Sin path traversal**: la extensión se sanea y el directorio se normaliza a ruta absoluta.
 
 ### Instalar cwebp en el servidor
 
@@ -1338,6 +1597,12 @@ export class AdminPage {}
 > cambiar su estado (`confirmed`, `cancelled`, `completed`). Para deshabilitar solo los emails
 > sin quitar la dependencia, pon `pimon.email.enabled: false` en `application.yml`.
 
+> **Reserva de X horas + calendario público (nuevo):** la reserva acepta `durationMinutes` (alta
+> admin con duración personalizada; si falta, se usa la del servicio). Endpoint público de
+> ocupación **sin datos del cliente**: `GET /api/busy?from=YYYY-MM-DD&to=YYYY-MM-DD` →
+> `[{ date, start, end }]`. Añade `/api/busy` a `pimon.security.public-paths`. Par frontend:
+> `<lib-booking-admin>` y `<lib-public-calendar>` de `@adrianmartincano/ng-reservations`.
+
 ### Entidades y tablas
 
 ```
@@ -1372,12 +1637,24 @@ El servicio `AvailabilityService` genera slots automáticamente según la config
 
 - Empieza en `work-start` y avanza de `slot-interval-minutes` en `slot-interval-minutes`
 - El último slot posible es `work-end - duration_minutes` del servicio (para que quepa la cita)
-- Marca como no disponibles los slots que ya tienen una reserva ese día
+- Un slot aparece como no disponible cuando reservarlo **se solaparía por intervalo** con reservas
+  activas hasta alcanzar la `capacity` (no por mera coincidencia de hora de inicio): una cita de
+  10:00–13:00 marca ocupados 11:00 y 12:00, y libera 13:00.
 
 Ejemplo con `work-start: 09:00`, `work-end: 20:00`, `slot-interval-minutes: 60`,
 servicio de 90 minutos:
 - Slots generados: 09:00, 10:00, 11:00 ... 18:00 (el 19:00 no cabe porque acabaría a las 20:30)
-- Si hay una reserva a las 10:00 → ese slot aparece con `available: false`
+- Si hay una reserva de 10:00 a 13:00 → 10:00, 11:00 y 12:00 aparecen con `available: false`
+
+> **Alta segura ante concurrencia (`POST /api/bookings`):** la creación toma un bloqueo pesimista
+> por día y comprueba solapes dentro de la transacción → dos peticiones simultáneas no pueden crear
+> reservas que se pisen (ni siquiera la primera del día). Si el horario está ocupado devuelve **409**.
+> La capacidad de recursos en paralelo se configura con `pimon.reservations.capacity` (por defecto 1).
+>
+> **H2 en local (desde 0.12.5):** la columna del cerrojo (`reservation_day_locks.day`) se mapea
+> entrecomillada (`@Column(name = "\"day\"")`) porque `DAY` es palabra reservada en H2. Antes el
+> `create table` fallaba y había que añadir `NON_KEYWORDS=DAY` a la URL de H2. En Postgres es la
+> misma columna `day` de siempre: actualizar no requiere migración.
 
 ### Endpoints públicos (sin autenticación)
 
@@ -1561,7 +1838,361 @@ pimon:
       - FRIDAY
       - SATURDAY
     slot-interval-minutes: 30    # intervalo entre slots (30 → 09:00, 09:30, 10:00...)
+    capacity: 1                  # nº de reservas que pueden solaparse a la vez (recursos en paralelo)
 ```
+
+---
+
+## `spring-dining` — Reservas de restaurante
+
+**ArtifactId:** `spring-dining`  
+**Paquete:** `dev.pimon.dining`  
+**Depende de:** `spring-common`, `spring-security`, `spring-emails`
+
+Reservas de **mesa** para bar/restaurante. Es un dominio **distinto** al de `spring-reservations`
+(citas): allí se reserva el *tiempo de un recurso* (un profesional); aquí se reserva una **mesa** y el
+eje es el **nº de comensales** (pax). La asignación es un problema de encaje de grupos en mesas
+(bin-packing), no de agenda.
+
+> **¿Cuándo cada uno?** `spring-reservations` para peluquería/tatuador/clínica (servicio + duración +
+> profesional). `spring-dining` para bar/restaurante (mesa + comensales + turno). Son librerías
+> independientes; una app de restaurante usa `spring-dining` (+ `spring-menu` para la carta).
+
+### Entidades y tablas
+
+```
+dining_zones                     ← zonas del local (Terraza, Salón, Barra)
+  id          VARCHAR(36) PK
+  name        VARCHAR NOT NULL
+  sort_order  INT
+  active      BOOLEAN DEFAULT true
+  created_at, updated_at
+
+dining_tables                    ← mesas, capacidad en COMENSALES (no en tiempo)
+  id            VARCHAR(36) PK
+  label         VARCHAR NOT NULL     — "Mesa 4", "Barra 2"
+  capacity_min  INT NOT NULL         — mínimo razonable (no sentar 2 en una mesa de 8)
+  capacity_max  INT NOT NULL         — tope de pax
+  combinable    BOOLEAN              — se puede juntar con otras de su zona
+  sort_order    INT
+  active        BOOLEAN DEFAULT true
+  pos_x, pos_y  INT                  — posición opcional para el plano de sala
+  zone_id       FK → dining_zones.id
+  created_at, updated_at
+
+dining_seatings                  ← turnos de servicio
+  id               VARCHAR(36) PK
+  name             VARCHAR NOT NULL  — "Comida", "Cena 1er turno"
+  start            VARCHAR(5)        — "20:00"
+  end              VARCHAR(5)        — "22:00"
+  duration_minutes INT              — cuánto ocupa la mesa la reserva del turno
+  sort_order       INT
+  active           BOOLEAN DEFAULT true
+  created_at, updated_at
+dining_seating_days              ← días de la semana en los que aplica cada turno
+  seating_id   FK → dining_seatings.id
+  day_of_week  VARCHAR  — 'MONDAY'...'SUNDAY'
+
+dining_reservations
+  id            VARCHAR(36) PK
+  date          DATE NOT NULL
+  seating_id    FK → dining_seatings.id
+  party_size    INT NOT NULL          — nº de comensales (eje del dominio)
+  client_name   VARCHAR NOT NULL
+  client_email  VARCHAR NOT NULL
+  client_phone  VARCHAR NOT NULL
+  notes         TEXT
+  status        VARCHAR              — PENDING, CONFIRMED, SEATED, NO_SHOW, CANCELLED, COMPLETED
+  deposit       DECIMAL              — señal/depósito (null = sin depósito)
+  created_at, updated_at
+dining_reservation_tables        ← mesa(s) asignada(s); 2+ = mesas juntadas (M:N)
+  reservation_id  FK → dining_reservations.id
+  table_id        FK → dining_tables.id
+dining_reservation_requests      ← peticiones especiales (enum)
+  reservation_id  FK → dining_reservations.id
+  request         VARCHAR  — TRONA, ACCESIBLE, TERRAZA, INTERIOR, TRANQUILA, CELEBRACION, ALERGIAS
+
+dining_day_locks                 ← fila-cerrojo por día (control de concurrencia)
+  day  VARCHAR(10) PK  — 'YYYY-MM-DD'
+```
+
+Estados que **ocupan** mesa y aforo: `PENDING`, `CONFIRMED`, `SEATED`. Liberan: `NO_SHOW`,
+`CANCELLED`, `COMPLETED`.
+
+### Cómo se asigna la mesa (best-fit + combinación)
+
+`TableAvailabilityService` resuelve, dado fecha + turno + comensales:
+
+1. **Mesa única que encaja** en `[capacity_min, capacity_max]` → la de menor `capacity_max` (best-fit,
+   minimiza sillas desperdiciadas).
+2. Si ninguna encaja exacta, **mesa única con `capacity_max ≥ comensales`** (ignora el mínimo, para no
+   bloquear grupos pequeños cuando solo quedan mesas grandes).
+3. Si tampoco, **combinación de mesas `combinable` de la misma zona** cuya capacidad sumada cubra al
+   grupo (greedy: las grandes primero; entre opciones, la de menos mesas y menor sobrante).
+
+Una mesa está **ocupada** en un turno si una reserva activa cuyo turno **se solapa** (ventanas
+`[start,end)` que se intersecan) ya la usa. Si `total-capacity > 0`, se valida además el **aforo
+global** del turno (Σ comensales activos + grupo ≤ aforo).
+
+> **Alta segura ante concurrencia (`POST /api/dining/reservations`):** se toma un **bloqueo pesimista**
+> sobre la fila-cerrojo del día (`dining_day_locks`) **antes** de leer ocupación y asignar, igual que
+> `spring-reservations`. Así dos grupos no se quedan con la misma mesa (ni en la primera reserva del
+> día). Sin mesa/aforo disponible → **409**.
+
+### Endpoints públicos (sin autenticación)
+
+```
+GET  /api/dining/zones                                   → zonas activas (preferencia)
+GET  /api/dining/seatings                                → turnos activos
+GET  /api/dining/availability?date&party&zoneId          → disponibilidad por turno (sin exponer mesas)
+POST /api/dining/reservations                            → crear reserva (modo público)
+```
+
+`GET /api/dining/availability?date=2026-06-20&party=4` →
+
+```json
+{
+  "success": true,
+  "data": [
+    { "seatingId": "uuid", "seatingName": "Comida", "start": "13:00", "end": "15:00", "available": true,  "suggestedTableIds": [] },
+    { "seatingId": "uuid", "seatingName": "Cena",   "start": "20:00", "end": "22:00", "available": false, "suggestedTableIds": [] }
+  ]
+}
+```
+
+`POST /api/dining/reservations` (el público no elige mesa; el backend asigna best-fit):
+
+```json
+{
+  "date": "2026-06-20",
+  "seatingId": "uuid",
+  "partySize": 4,
+  "clientName": "Ada Lovelace",
+  "clientEmail": "ada@example.com",
+  "clientPhone": "600000000",
+  "notes": "Cumpleaños",
+  "requests": ["TRONA", "CELEBRACION"],
+  "zoneId": "uuid-terraza"
+}
+```
+
+### Endpoints de administración (`ROLE_ADMIN` / `ROLE_EDITOR`)
+
+```
+GET/PUT /api/admin/dining/settings                       → aforo, antelación, días cerrados
+# Zonas
+GET    /api/admin/dining/zones
+POST   /api/admin/dining/zones
+PUT    /api/admin/dining/zones/{id}
+PATCH  /api/admin/dining/zones/{id}/toggle-active
+DELETE /api/admin/dining/zones/{id}                      → 409 si tiene mesas
+# Mesas
+GET    /api/admin/dining/tables
+POST   /api/admin/dining/tables
+PUT    /api/admin/dining/tables/{id}
+PATCH  /api/admin/dining/tables/{id}/toggle-active
+DELETE /api/admin/dining/tables/{id}                     → 409 si tiene reservas
+# Turnos
+GET    /api/admin/dining/seatings
+POST   /api/admin/dining/seatings
+PUT    /api/admin/dining/seatings/{id}
+PATCH  /api/admin/dining/seatings/{id}/toggle-active
+DELETE /api/admin/dining/seatings/{id}                   → 409 si tiene reservas
+# Reservas
+GET    /api/admin/dining/availability?date&party&zoneId  → disponibilidad CON mesas sugeridas
+GET    /api/admin/dining/reservations?status&page&size   → listado paginado
+GET    /api/admin/dining/reservations/day?date           → plano del día (todas)
+GET    /api/admin/dining/reservations/{id}
+POST   /api/admin/dining/reservations                    → alta admin (salta antelación/cierre; tableIds manual)
+PUT    /api/admin/dining/reservations/{id}               → edición completa (reasigna o conserva mesas)
+PATCH  /api/admin/dining/reservations/{id}/status        → cambiar estado
+PATCH  /api/admin/dining/reservations/{id}/tables        → reasignar mesas a mano
+```
+
+El **modo admin** (`POST`/`PUT`) puede saltarse la antelación y los días cerrados, y **forzar mesas**
+con `tableIds`. La edición completa conserva las mesas actuales si siguen siendo válidas; si cambió
+turno/fecha/comensales o ya no caben, reasigna best-fit (salvo `tableIds` manuales).
+
+### Configuración editable en caliente y `application.yml`
+
+Ajustes vivos en `app_settings` (clave `"dining"`); `application.yml` aporta los defaults:
+
+```yaml
+pimon:
+  dining:
+    total-capacity: 0       # aforo total en comensales por turno; 0 = sin tope (manda la mesa)
+    max-advance-days: 60    # antelación máxima para reservar
+    min-advance-hours: 1    # antelación mínima antes del turno
+    blocked-dates: []       # días cerrados ISO 'YYYY-MM-DD'
+```
+
+Los **turnos** no van aquí: son entidades `Seating` (con días y duración), gestionadas desde el panel.
+
+> **`public-paths`:** añade `/api/dining/zones`, `/api/dining/seatings`, `/api/dining/availability` y
+> `/api/dining/reservations` para que el flujo público funcione sin autenticación.
+
+---
+
+## `spring-menu` — Carta y menú del día
+
+**ArtifactId:** `spring-menu`  
+**Paquete:** `dev.pimon.menu`  
+**Depende de:** `spring-common`, `spring-security`
+
+La carta de un bar/restaurante. Dos **agregados independientes** dentro del mismo módulo:
+
+- **Carta** (permanente): categorías → platos, estable en el tiempo.
+- **Menú del día** (fechado): oferta a precio fijo para una fecha; se **publica/clona** cada día y la
+  carta sigue ahí. Sus opciones **reutilizan platos de la carta** o son **líneas libres** (especial del día).
+
+> **Sin imágenes subidas (decisión de diseño).** La carta es **tipográfica**: nada de fotos por plato
+> (envejecen mal, dan aire de carta plastificada, y compiten con la tipografía cuidada). La decoración
+> es solo un **icono curado** por categoría y la **presentación** (fuente/color/layout). El módulo **no
+> depende de `spring-storage`**. No reutiliza `spring-products` (eso es catálogo de e-commerce con
+> stock/checkout; aquí no hay ni stock ni carrito, pero sí alérgenos y raciones).
+
+### Entidades y tablas
+
+```
+menu_categories                  ← categorías de la carta (Entrantes, Carnes, Postres, Vinos)
+  id          VARCHAR(36) PK
+  name        VARCHAR NOT NULL
+  slug        VARCHAR UNIQUE         — generado del nombre
+  description TEXT
+  icon        VARCHAR(20)            — enum curado: NONE, ENTRANTES, CARNES, VINOS... (no es imagen)
+  sort_order  INT
+  active      BOOLEAN DEFAULT true
+  created_at, updated_at
+
+menu_items                       ← platos
+  id           VARCHAR(36) PK
+  name         VARCHAR NOT NULL
+  description  TEXT
+  price        DECIMAL              — precio base/única ración (null si solo hay raciones)
+  vegan, vegetarian, gluten_free, spicy   BOOLEAN  — flags dietéticos
+  badge        VARCHAR              — "Sugerencia del chef", "Nuevo" (texto, no imagen)
+  available    BOOLEAN DEFAULT true — "agotado hoy" sin borrarlo
+  sort_order   INT
+  category_id  FK → menu_categories.id
+  created_at, updated_at
+menu_item_portions               ← raciones con precio (tapa/media/ración); vacío = usa price
+  item_id  FK → menu_items.id
+  label    VARCHAR(40)
+  amount   DECIMAL
+menu_item_allergens              ← 14 alérgenos UE (enum)
+  item_id   FK → menu_items.id
+  allergen  VARCHAR(20)  — GLUTEN, CRUSTACEOS, HUEVOS, PESCADO, LACTEOS, FRUTOS_CASCARA...
+
+menu_daily                       ← un menú del día (clave única date+name)
+  id            VARCHAR(36) PK
+  date          DATE NOT NULL
+  name          VARCHAR NOT NULL      — "Menú del día", "Menú ejecutivo"
+  price         DECIMAL NOT NULL      — precio fijo
+  description   TEXT                  — "Incluye pan, bebida y postre"
+  published     BOOLEAN DEFAULT false — borrador ↔ publicado
+  published_at  TIMESTAMP
+  created_at, updated_at
+  UNIQUE (date, name)
+menu_daily_course                ← grupos de elección (Primeros, Segundos, Postres)
+  id             VARCHAR(36) PK
+  daily_menu_id  FK → menu_daily.id
+  name           VARCHAR NOT NULL
+  choose         INT  — nº de opciones que elige el comensal (normalmente 1)
+  sort_order     INT  (@OrderColumn)
+menu_daily_option                ← opción: plato de la carta O línea libre
+  id           VARCHAR(36) PK
+  course_id    FK → menu_daily_course.id
+  item_id      FK → menu_items.id   — null = línea libre
+  name         VARCHAR              — usado si item_id es null
+  description  TEXT
+  supplement   DECIMAL              — suplemento sobre el precio fijo (+3€ solomillo)
+  sort_order   INT  (@OrderColumn)
+menu_daily_option_allergens      ← alérgenos de la línea libre (si item_id es null)
+  option_id  FK → menu_daily_option.id
+  allergen   VARCHAR(20)
+```
+
+> **Reutilización vs línea libre.** Una opción que apunta a un `menu_items` **hereda** nombre,
+> descripción y alérgenos del plato (un cambio en la carta se propaga). Si es línea libre, lleva sus
+> propios nombre/descripción/alérgenos. La API del menú del día devuelve cada opción **ya resuelta**.
+
+### Presentación (fuente y estilos)
+
+Editable en caliente, en `app_settings` (clave `"menu"`). Gobierna carta **y** menú del día. Se
+guardan **nombres de fuente de una whitelist**, nunca CSS libre (seguridad + consistencia); el front
+los aplica vía variables CSS (`--menu-heading-font`, `--menu-body-font`, color de acento, layout).
+
+```json
+{
+  "headingFont": "SERIF",        // SYSTEM | SERIF | SANS | SLAB | DISPLAY | HANDWRITTEN | MONO
+  "bodyFont": "SANS",
+  "accentColor": "#8a5a2b",      // validado #RRGGBB
+  "layout": "LIST",              // LIST | CARDS | COLUMNS
+  "showPrices": true,
+  "showAllergens": true,
+  "currency": "EUR"
+}
+```
+
+### Endpoints públicos (sin autenticación)
+
+```
+GET /api/menu                    → carta completa: categorías con platos disponibles + presentación
+GET /api/menu/categories         → solo categorías activas
+GET /api/menu/daily?date         → menús del día PUBLICADOS de la fecha (por defecto, hoy)
+```
+
+`GET /api/menu` devuelve un `CartaDto` listo para pintar (categorías agrupadas con sus platos y la
+presentación), sin más llamadas.
+
+### Endpoints de administración (`ROLE_ADMIN` / `ROLE_EDITOR`)
+
+```
+GET/PUT /api/admin/menu/presentation                     → fuente/estilos
+# Categorías
+GET    /api/admin/menu/categories
+POST   /api/admin/menu/categories
+PUT    /api/admin/menu/categories/{id}
+PATCH  /api/admin/menu/categories/{id}/toggle-active
+DELETE /api/admin/menu/categories/{id}                   → 409 si tiene platos
+# Platos
+GET    /api/admin/menu/items?categoryId
+POST   /api/admin/menu/items
+PUT    /api/admin/menu/items/{id}
+PATCH  /api/admin/menu/items/{id}/toggle-available
+DELETE /api/admin/menu/items/{id}
+# Menú del día
+GET    /api/admin/menu/daily?date                        → menús (cualquier estado) de una fecha
+GET    /api/admin/menu/daily/range?from&to               → por rango de fechas
+GET    /api/admin/menu/daily/history?page&size           → histórico paginado (menús antiguos)
+GET    /api/admin/menu/daily/{id}
+POST   /api/admin/menu/daily
+PUT    /api/admin/menu/daily/{id}
+POST   /api/admin/menu/daily/{id}/publish
+POST   /api/admin/menu/daily/{id}/unpublish
+POST   /api/admin/menu/daily/{id}/clone?toDate           → clona a otra fecha (borrador)
+DELETE /api/admin/menu/daily/{id}
+```
+
+Un plato exige **al menos un precio**: o `price` base, o alguna ración. El alta del menú del día exige
+que cada opción **referencie un plato (`itemId`) o tenga nombre** (línea libre). `clone` copia grupos y
+opciones a otra fecha como **borrador** (el caso real: "el de ayer con un cambio").
+
+### `application.yml`
+
+```yaml
+pimon:
+  menu:
+    heading-font: SERIF
+    body-font: SANS
+    accent-color: "#8a5a2b"
+    layout: LIST
+    show-prices: true
+    show-allergens: true
+    currency: EUR
+```
+
+> **`public-paths`:** añade `/api/menu/**` para que la carta y el menú del día sean accesibles sin login.
 
 ---
 
@@ -1886,6 +2517,70 @@ Las plantillas van en `src/main/resources/templates/` de **tu aplicación** (no 
 
 ---
 
+### Recuperar la contraseña olvidada (desde 0.6.0)
+
+Dos endpoints, los dos bajo `/api/auth/**`, que ya es público. **Tiene que serlo**: quien
+los usa no puede entrar, que es justo el problema que vienen a resolver.
+
+```
+POST /api/auth/recuperar     { email }              → siempre responde lo mismo
+POST /api/auth/restablecer   { token, password }    → cambia la contraseña
+```
+
+#### La librería no manda el correo
+
+Publica `RecuperacionSolicitada(email, nombre, token)` y cada tienda lo envía con su
+plantilla y su URL. Mismo criterio que `PedidoCambioEstado`: aquí no se sabe cómo se llama
+la tienda ni cuál es su pantalla de restablecer. Y así `spring-users` sigue sin depender de
+`spring-emails`.
+
+```java
+@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+void enviar(RecuperacionSolicitada e) {
+    String enlace = "https://mitienda.com/restablecer?token=" + e.token();
+    email.sendTemplate(e.email(), "Recupera tu contraseña", "recuperar",
+                       Map.of("nombre", e.nombre(), "enlace", enlace));
+}
+```
+
+> ⚠️ **Ese evento lleva el token EN CLARO** — es la única vez que existe fuera del correo
+> del usuario. Úsalo para el enlace y nada más: **no lo registres en un log**. Un token en
+> un fichero de log es un token que sigue abriendo la cuenta. Su `toString()` lo oculta
+> para que un `log.info("{}", evento)` accidental no lo escriba, pero eso no cubre
+> escribirlo a mano.
+
+#### Las cuatro decisiones que sostienen esto
+
+**1. Siempre se responde lo mismo**, exista el correo o no. Contestar «ese correo no está
+registrado» convertiría la pantalla en un buscador de clientes: se prueban direcciones y se
+apunta cuáles responden distinto. Por eso `solicitar()` **no lanza** cuando no encuentra la
+cuenta.
+
+**2. En la base se guarda el hash**, nunca el token. El original solo existe en el correo
+del usuario. El día que alguien lea la base —una copia mal guardada, un volcado— esas filas
+no valen para nada. Y por eso mismo **no se puede reenviar un enlace ya emitido**: nadie
+sabe cuál era. Pedirlo otra vez emite uno nuevo.
+
+**3. Un solo uso y una hora de vida.** Un enlace de recuperación acaba en la bandeja de
+entrada y ahí se queda para siempre; sin estas dos cosas, un correo de hace dos años
+seguiría abriendo la cuenta.
+
+**4. Al usar uno mueren los demás** de esa cuenta. Quien pidió el enlace tres veces porque
+el correo tardaba dejaría si no dos permisos vivos **después** de haber recuperado la
+cuenta.
+
+#### Lo que NO hace
+
+**No limita cuántas veces se puede pedir.** Alguien puede pedir mil recuperaciones del
+correo de otro y llenarle la bandeja. No se resuelve dentro porque hacerlo bien necesita
+contar peticiones por IP y por cuenta, con almacenamiento y ventana temporal, y a medias es
+peor que no tenerlo. Si algún día molesta, se pone delante.
+
+#### La tabla
+
+`tokens_recuperacion` (user_id, hash único, expira_en, usado_en). En un proyecto con
+`ddl-auto: update` aparece sola; **con `validate` hay que escribir su migración**.
+
 ## `spring-ecommerce` — Pedidos y pagos
 
 **ArtifactId:** `spring-ecommerce`  
@@ -1919,6 +2614,64 @@ order_items
   product_image_url VARCHAR         — snapshot de la imagen
   unit_price        DECIMAL         — snapshot del precio en el momento de la compra
   quantity          INT
+  opciones          TEXT            — JSON con lo elegido en esa línea. NULL si no se usan
+```
+
+### Opciones por línea (desde 0.3.0)
+
+Una línea de pedido puede llevar lo que el cliente eligió para ella: el color de un
+filamento, la dedicatoria de un libro, el tono de unas mechas.
+
+**La librería no sabe qué significan.** Solo transporta pares nombre/valor y los guarda
+como JSON en `order_items.opciones`. Cada tienda decide qué mete y qué es válido.
+
+```json
+POST /api/checkout/create-intent
+{
+  "items": [
+    { "productId": "abc", "quantity": 2, "opciones": { "color": "Morado" } }
+  ],
+  "shippingCountry": "ES"
+}
+```
+
+**Por qué esto y no variantes de producto:** una variante de verdad lleva existencias,
+precio y fotos propias, y arrastra el catálogo entero. Esto es una opción del encargo, que
+es lo que necesita una tienda que fabrica bajo demanda. Meter variantes completas
+complicaría el checkout de todas las webs para no servir a ninguna.
+
+**Por qué en una columna de texto y no en una tabla aparte:** hecho el pedido, esto es solo
+lectura, igual que el nombre y el precio que ya se copian en la fila. Nadie consulta
+pedidos filtrando por color, así que una tabla traería un join en cada consulta para no
+ganar nada.
+
+#### Validar las opciones: `ValidadorOpciones`
+
+La comprobación **se hace siempre en el servidor**: el desplegable de la web solo enseña lo
+válido, pero la petición se puede construir a mano.
+
+Mismo patrón que `CalculadorEnvio`: la librería define el hueco y el proyecto lo rellena.
+Si no se declara ninguno, las opciones se aceptan tal cual — una tienda que no las use no
+tiene que implementar nada.
+
+```java
+@Bean
+public ValidadorOpciones validadorOpciones() {
+    return (producto, opciones) -> {
+        String color = opciones.get("color");
+        if (color != null && !coloresDisponibles.contains(color)) {
+            throw AppException.badRequest("Ahora mismo no hay " + color);
+        }
+    };
+}
+```
+
+**Al subir a 0.3.0:** hay una columna nueva en `order_items`. Los proyectos con
+`ddl-auto: update` (lacajadelaton) la crean solos; los que usan Flyway con `validate`
+(pimon3d) necesitan una migración:
+
+```sql
+ALTER TABLE order_items ADD COLUMN opciones TEXT;
 ```
 
 ### Estados de un pedido (`OrderStatus`)
@@ -1932,6 +2685,117 @@ order_items
 | `DELIVERED` | Entregado al cliente |
 | `CANCELLED` | Cancelado (puede ser por el cliente o por fallo de pago) |
 | `REFUNDED` | Devuelto |
+
+**Desde 0.4.0 `OrderDto` incluye `shippingPostalCode` y `shippingPhone`.** Antes no salían
+—la entidad sí los guardaba— y sin ellos **desde el panel no se puede rellenar una etiqueta
+de envío**: había que entrar a la base de datos a buscar el código postal de cada pedido.
+El teléfono tampoco es un adorno: es lo que pide el transportista para avisar antes de
+entregar.
+
+### Caducar los pedidos sin pagar (desde 0.4.0)
+
+`create-intent` **descuenta el stock al crear el pedido**, antes de cobrar. Es lo correcto:
+sin eso, dos personas podrían comprar la última pieza mientras cada una teclea su tarjeta y
+una de las dos recibiría un correo de disculpa.
+
+La contrapartida es que quien llega al pago y cierra la pestaña deja ese stock retenido.
+Hasta la 0.4.0 **no lo devolvía nadie**, y una tienda pequeña acababa «sin existencias» de
+algo que tenía en la mano.
+
+```yaml
+pimon:
+  ecommerce:
+    caducidad:
+      enabled: true          # viene APAGADO: cancela pedidos y mueve existencias
+      espera: 30m            # cuánto se espera antes de darlo por perdido
+      intervalo-ms: 300000   # cada cuánto se revisa
+```
+
+**Viene apagado a propósito.** Que se pusiera en marcha solo al actualizar la librería sería
+una sorpresa fea en una tienda en funcionamiento.
+
+**La media hora es holgada a propósito.** Un pago con verificación del banco (3-D Secure)
+tarda minutos, y quien deja la pestaña abierta mientras busca la tarjeta, más. Quedarse
+corto cancela compras vivas.
+
+#### Ante la duda, no se cancela
+
+Antes de tocar un pedido se le pregunta a Stripe en qué estado está su pago. Si responde
+`succeeded`, `processing` o `requires_capture`, **no se cancela** y se registra un `ERROR`
+en el log: eso es un webhook perdido, y hay un cliente que ha pagado cuyo pedido nadie está
+preparando.
+
+Si Stripe **no contesta** —red, clave mal— tampoco se cancela. Los dos errores posibles no
+cuestan lo mismo:
+
+| Error | Coste |
+|---|---|
+| Dejar colgado un pedido muerto | Retiene stock. Se ve en el panel y se arregla a mano. |
+| Cancelar un pedido pagado | Dinero cobrado, pedido cancelado y la pieza vendida otra vez. **El cliente se entera antes que tú.** |
+
+Con Stripe apagado (modo simulado) sí se caduca sin preguntar: ahí no hay dinero real.
+
+#### Cancelar siempre devuelve el stock
+
+Hay **tres** caminos por los que un pedido se queda sin comprarse, y los tres devuelven las
+unidades al catálogo:
+
+| Camino | Quién lo dispara |
+|---|---|
+| El pago falla | El webhook `payment_intent.payment_failed` |
+| El pedido caduca | La tarea programada |
+| Alguien lo cancela | El botón del panel |
+
+Los tres pasan por `StockDePedidos.devolver()`. Con la resta repetida en cada sitio, el día
+que cambie algo se arregla en dos y se olvida el tercero — y eso **no da error**: solo deja
+piezas «agotadas» que están en el almacén.
+
+**`REFUNDED` no devuelve stock, y es deliberado:** ahí el artículo ya salió por la puerta.
+Que vuelva al catálogo es una decisión del negocio —un libro se revende, una pieza impresa
+a medida no— y por eso no se decide en la librería.
+
+> ⚠️ **Sin tests todavía.** El módulo `spring-ecommerce` no tiene ninguno, y esto toca
+> stock y cobros. Pruébalo en un entorno de pruebas antes de encenderlo en producción.
+
+### Enterarse de que un pedido cambia: `PedidoCambioEstado` (desde 0.5.0)
+
+La librería sabe cuándo entra un pago, pero **no sabe qué hacer con esa noticia**: eso
+depende de la tienda. Una manda un correo, otra avisa por Telegram, otra imprime una
+etiqueta. Por eso `spring-ecommerce` **no depende de `spring-emails`** y no manda ningún
+correo: publica un evento y cada proyecto decide.
+
+```java
+@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+void avisar(PedidoCambioEstado e) {
+    if (e.pasoA(OrderStatus.PAID)) {
+        // el correo, el Telegram, lo que sea
+    }
+}
+```
+
+> ⚠️ **`@TransactionalEventListener` con `AFTER_COMMIT`, no `@EventListener` a secas.** El
+> evento se publica dentro de la transacción que guarda el pedido. Un listener normal corre
+> ahí dentro, así que si la transacción se deshace después habrías mandado un correo sobre
+> un pedido que no existe.
+
+**Se publican todos los cambios**, incluidos los automáticos —el pago que falla, el pedido
+que caduca—. Filtrar en la librería sería decidir por la tienda qué merece un aviso, y hay
+quien querrá avisar de que un pedido caducó. Quien escucha elige.
+
+#### Por qué un evento y no otro bean
+
+`CalculadorEnvio` y `ValidadorOpciones` son cosas que la librería **pregunta**: necesita la
+respuesta para seguir, y por eso son interfaces con un valor por defecto. Esto lo
+**anuncia**: no espera nada de vuelta, y pueden escucharlo cero o cinco sitios sin cambiar
+la costura.
+
+#### Un solo sitio cambia el estado
+
+Los cinco caminos —pago confirmado, pago fallido, cambio manual, reembolso y caducidad—
+pasan por `OrderService`, que guarda y anuncia en el mismo método privado. `CaducidadPedidos`
+decide **cuáles** caducan pero no toca el pedido: llama a `cancelarPorCaducidad()`.
+Repartirlo entre dos clases es como se acaba publicando el evento en cuatro caminos y
+olvidándolo en el quinto.
 
 ### Flujo de pago con Stripe
 
@@ -2165,6 +3029,270 @@ POST /api/admin/newsletter/campaigns → email a todos los confirmados,
 - `NewsletterSubscriber` — email único, `status` (`PENDING/CONFIRMED/UNSUBSCRIBED`), `source`,
   tokens de confirmación y de baja, timestamps.
 - `NewsletterCampaign` — asunto, cuerpo, nº de destinatarios, fecha de envío.
+
+---
+
+## `spring-events` — Webs de eventos (RSVP)
+
+**ArtifactId:** `spring-events`
+**Paquete:** `dev.pimon.events`
+**Depende de:** `spring-common`
+
+Backend de la librería Angular `@adrianmartincano/ng-events`. Recibe las **confirmaciones de
+asistencia (RSVP)** de los invitados de un evento (boda, cumpleaños…) y ofrece un **resumen
+agregado** para el organizador. Se autoconfigura como los demás módulos.
+
+### Entidad `Rsvp` (tabla `events_rsvp`)
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `eventId` | `String` | Slug del evento (agrupa las respuestas); indexado |
+| `name` | `String` | Nombre del invitado |
+| `email` | `String` | Opcional |
+| `attending` | `boolean` | ¿Asiste? |
+| `guests` | `int` | Acompañantes además del invitado (solo cuentan si asiste) |
+| `menuChoice` | `String` | Opción de menú elegida |
+| `allergies`, `song`, `message` | `String` | Alergias, canción pedida y mensaje libre |
+
+### Endpoints
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| POST | `/api/events/rsvp` | Público | Registra la confirmación (`eventId`, `name` y `attending` obligatorios). Devuelve `RsvpDto`. |
+| GET | `/api/events/rsvp/summary?eventId=` | Público | `confirmed`, `declined`, `totalGuests` y `byMenu`. **Solo cifras, sin datos personales.** |
+
+```bash
+curl -X POST https://api.midominio.com/api/events/rsvp \
+  -H 'Content-Type: application/json' \
+  -d '{ "eventId": "maria-y-juan", "name": "Ana", "attending": true, "guests": 1, "menuChoice": "Vegano" }'
+```
+
+> El listado con los datos de cada invitado todavía no tiene endpoint; hoy solo se expone el resumen.
+
+---
+
+## `spring-fx` — Tasas de cambio
+
+**ArtifactId:** `spring-fx`
+**Paquete:** `dev.pimon.fx`
+**Depende de:** `spring-common`
+
+Sirve **tasas de cambio** por API para que el frontend multi-divisa
+(`provideLibFormat` / `provideFxSync` de `@adrianmartincano/ng-models`) convierta importes.
+Por defecto las tasas son las que pongas en `application.yml` (estáticas); opcionalmente puede
+**refrescarlas en automático** desde una API externa sin API key (frankfurter.app).
+
+### Configuración
+
+```yaml
+pimon:
+  fx:
+    base: EUR
+    rates:
+      USD: 1.16
+      GBP: 0.86
+    refresh:
+      enabled: false          # true = refresca periódicamente desde una API externa
+      url: "https://api.frankfurter.app/latest?base="   # se le concatena la base
+      interval-ms: 21600000   # cada 6 h (primer refresco al arrancar)
+  security:
+    public-paths:
+      - "/api/fx"             # el endpoint público debe estar abierto
+```
+
+> Las tasas son "1 base = rate X". Con `refresh.enabled: true` el módulo consulta la API externa
+> al arrancar y cada `interval-ms`; si la llamada falla, conserva las últimas tasas válidas.
+
+### Endpoints
+
+| Método | Ruta | Acceso | Descripción |
+|---|---|---|---|
+| GET | `/api/fx` | Público | Base + tasas actuales: `{ base, rates, updatedAt }`. |
+| PUT | `/api/admin/fx` | ADMIN | Actualiza tasas: `{ rates: {...}, replace: false }` (fusiona) o `{ base, rates, replace: true }` (sustituye). |
+| POST | `/api/admin/fx/refresh` | ADMIN | Fuerza un refresco desde la API externa configurada. |
+
+```bash
+curl https://api.midominio.com/api/fx
+# → { "success": true, "data": { "base": "EUR",
+#     "rates": { "USD": 1.16, "GBP": 0.86 }, "updatedAt": "2026-06-15T10:00:00Z" } }
+```
+
+### Enganche con el frontend
+
+```typescript
+// app.config.ts del proyecto Angular
+provideLibFormat({ defaultCurrencyCode: 'EUR', currencies: [...] }),
+provideFxSync({ url: '/api/fx' }),   // carga las tasas del backend al arrancar (best-effort)
+```
+
+Al arrancar, el front pide `/api/fx` y aplica las tasas al `FormatService`; todos los importes
+se muestran convertidos. Si el backend no responde, se usan las tasas estáticas de `provideLibFormat`.
+
+---
+
+## `spring-forum` — Foro de comunidad
+
+**ArtifactId:** `spring-forum`  
+**Paquete:** `dev.pimon.forum`  
+**Depende de:** `spring-common`, `spring-security`
+
+Foro de comunidad: **categorías** (que gestiona el admin) → **hilos** que abren los usuarios →
+**mensajes**. Encima: reacciones, citas, notificaciones, búsqueda y moderación. Es un dominio
+distinto al de `spring-blog` (bitácora cronológica del admin con comentarios): aquí cualquier
+usuario registrado abre temas y conversa.
+
+> **Decisión de diseño:** el **mensaje de apertura** de un hilo es también un `ForumPost`
+> (con `opening = true`). Así reacciones, citas, edición y borrado funcionan igual para la
+> apertura y para las respuestas, sin casos especiales. Borrar el mensaje de apertura borra
+> el hilo entero (en cascada con sus reacciones y denuncias).
+
+### Entidades y tablas
+
+```
+forum_categories                 ← secciones del foro (las crea/ordena el admin)
+  id          VARCHAR(36) PK
+  slug        VARCHAR UNIQUE NOT NULL
+  name        VARCHAR NOT NULL
+  description VARCHAR(500)
+  position    INT                  — orden en la portada (menor primero)
+  icon, color VARCHAR              — opcionales, para la portada
+  created_at, updated_at
+
+forum_threads                    ← hilos/temas (los abre un usuario)
+  id                   VARCHAR(36) PK
+  category_id          FK → forum_categories.id
+  slug                 VARCHAR UNIQUE NOT NULL
+  title                VARCHAR NOT NULL
+  author_id            VARCHAR NOT NULL
+  author_name          VARCHAR NOT NULL    — nick al abrir (se resuelve en vivo al servir)
+  author_is_admin      BOOLEAN             — distintivo ★ Admin
+  pinned               BOOLEAN             — fijado arriba (moderación)
+  locked               BOOLEAN             — cerrado: no admite respuestas
+  reply_count          INT                 — denormalizado (respuestas, sin la apertura)
+  view_count           BIGINT              — visitas al detalle
+  last_post_at         TIMESTAMP           — ordena la lista de hilos
+  last_post_author_name VARCHAR
+  created_at, updated_at
+
+forum_posts                      ← mensajes de un hilo (apertura incluida)
+  id              VARCHAR(36) PK
+  thread_id       FK → forum_threads.id
+  author_id       VARCHAR NOT NULL
+  author_name     VARCHAR NOT NULL
+  author_is_admin BOOLEAN
+  body            TEXT NOT NULL
+  opening         BOOLEAN             — true = mensaje de apertura del hilo
+  quoted_post_id  VARCHAR             — cita: id del mensaje citado (o null)
+  edited_at       TIMESTAMP           — null si no se ha editado
+  created_at, updated_at
+
+forum_reactions                  ← reacciones a un mensaje
+  id      VARCHAR(36) PK
+  post_id VARCHAR NOT NULL
+  user_id VARCHAR NOT NULL
+  type    VARCHAR(20)  — LIKE, LOVE, LAUGH, THANKS
+  UNIQUE (post_id, user_id, type)   — poner/quitar cada tipo una vez
+
+forum_notifications              ← avisos para un usuario
+  id            VARCHAR(36) PK
+  recipient_id  VARCHAR NOT NULL
+  type          VARCHAR(20)  — REPLY, QUOTE, REACTION
+  actor_name    VARCHAR NOT NULL
+  thread_id, thread_slug, thread_title
+  post_id       VARCHAR
+  read          BOOLEAN
+  created_at, updated_at
+
+forum_reports                    ← denuncias de mensajes (moderación)
+  id            VARCHAR(36) PK
+  post_id       VARCHAR NOT NULL
+  reporter_id   VARCHAR NOT NULL
+  reporter_name VARCHAR NOT NULL
+  reason        VARCHAR(1000)
+  status        VARCHAR(20)  — OPEN, RESOLVED
+  created_at, updated_at
+```
+
+### Nick en vivo (igual que `spring-blog`)
+
+Hilos y mensajes guardan `author_name` al escribir, pero al servir se resuelve el **nick actual
+del perfil** con un bean opcional `ForumAuthorNameResolver` que provee la app (p. ej. consultando
+`spring-users`). Así cambiar el nick se refleja en todo el foro y el cliente no puede falsearlo.
+Si no hay bean, cae a la parte local del email.
+
+```java
+@Component
+public class ForumAuthorResolver implements ForumAuthorNameResolver {
+    private final UserService users;
+    public ForumAuthorResolver(UserService users) { this.users = users; }
+    @Override public String resolve(String userId) {
+        try { return users.getById(userId).name(); } catch (Exception e) { return null; }
+    }
+}
+```
+
+### Endpoints públicos (`/api/forum`)
+
+Leer es público; escribir exige usuario autenticado (`@CurrentUser`). El listado de mensajes
+acepta token opcional para personalizar el flag `reacted` de cada reacción.
+
+```
+GET    /api/forum/categories                        → categorías + nº de hilos
+GET    /api/forum/categories/{slug}/threads         → hilos de la categoría (fijados primero)
+POST   /api/forum/categories/{slug}/threads         → abrir hilo (título + 1er mensaje)
+GET    /api/forum/threads/{slug}                     → detalle del hilo (+ incrementa visitas)
+GET    /api/forum/threads/{slug}/posts               → mensajes paginados
+POST   /api/forum/threads/{slug}/posts               → responder (admite quotedPostId)
+PUT    /api/forum/posts/{id}                          → editar el propio mensaje (ventana de edición)
+DELETE /api/forum/posts/{id}                          → borrar el propio mensaje
+POST   /api/forum/posts/{id}/reactions               → poner/quitar reacción {type}; devuelve resumen
+POST   /api/forum/posts/{id}/report                  → denunciar {reason}
+GET    /api/forum/search?q&page&size                 → busca en títulos de hilo y cuerpos de mensaje
+GET    /api/forum/notifications                       → bandeja del usuario (paginada)
+GET    /api/forum/notifications/unread-count          → { count }
+POST   /api/forum/notifications/{id}/read             → marcar una como leída
+POST   /api/forum/notifications/read-all              → marcar todas como leídas
+```
+
+Las **notificaciones** se emiten al responder (a el autor del hilo), citar (al autor citado) y
+reaccionar (al autor del mensaje); nunca a uno mismo, y se deduplica si el autor del hilo coincide
+con el citado.
+
+### Endpoints de administración (`/api/admin/forum`, `ROLE_ADMIN`)
+
+```
+GET    /api/admin/forum/categories
+POST   /api/admin/forum/categories                   → crear categoría
+PUT    /api/admin/forum/categories/{id}              → editar
+DELETE /api/admin/forum/categories/{id}?force        → 409 si tiene hilos; force=true borra en cascada
+POST   /api/admin/forum/threads/{id}/move?categoryId → mover hilo de categoría
+POST   /api/admin/forum/threads/{id}/pin?value       → fijar / desfijar
+POST   /api/admin/forum/threads/{id}/lock?value      → cerrar / reabrir
+DELETE /api/admin/forum/threads/{id}                  → borrar hilo (cascada)
+DELETE /api/admin/forum/posts/{id}                    → borrar cualquier mensaje
+GET    /api/admin/forum/reports?onlyOpen&page&size    → cola de denuncias
+POST   /api/admin/forum/reports/{id}/resolve          → marcar resuelta
+```
+
+### Configuración y `application.yml`
+
+```yaml
+pimon:
+  forum:
+    edit-window-minutes: 15         # minutos para editar el propio mensaje; 0 = sin límite
+    max-notifications-per-user: 0   # conserva las N notificaciones más recientes por usuario; 0 = no podar
+```
+
+El **admin no tiene límite** de edición. Un usuario normal solo puede editar su mensaje dentro de
+la ventana (pasado el plazo → 403). El front debe usar el mismo valor para ocultar el botón "Editar".
+
+**Retención de notificaciones:** con `max-notifications-per-user > 0`, al emitir un aviso se borran
+los más antiguos del destinatario que excedan N (la tabla queda acotada por usuario). Con `0` (por
+defecto) no se poda: la bandeja crece sin tope.
+
+> **`public-paths`:** añade `/api/forum/**` para que leer el foro (categorías, hilos, mensajes,
+> búsqueda) funcione sin autenticación. Escribir/reaccionar/denunciar/notificaciones requieren JWT
+> aunque la ruta esté en `public-paths` (el servicio exige `@CurrentUser`).
 
 ---
 

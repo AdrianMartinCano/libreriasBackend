@@ -15,6 +15,15 @@ import org.thymeleaf.context.Context;
 
 import java.util.Map;
 
+/**
+ * Servicio de envío de emails (Thymeleaf + JavaMailSender).
+ *
+ * <p><b>Contrato "best-effort" (importante):</b> {@link #send} captura cualquier error de envío,
+ * lo registra y <b>no lo propaga</b>. Es intencionado: un email es un efecto secundario y su fallo
+ * (SMTP caído, dirección inválida...) nunca debe romper la operación de negocio que lo dispara
+ * (confirmar una reserva, registrar un pedido...). Si se necesita conocer el resultado del envío
+ * (p. ej. reintentos), conviene comprobar los logs o evolucionar a un envío con estado/cola.</p>
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor

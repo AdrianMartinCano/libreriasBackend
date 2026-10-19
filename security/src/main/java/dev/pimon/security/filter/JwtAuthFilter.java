@@ -37,15 +37,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         String token = extractToken(request);
 
-        if (token != null && jwtProvider.validateToken(token)) {
-            AuthUser user = jwtProvider.extractUser(token);
+        if (token != null) {
+            // Un único parseo: valida firma + expiración y extrae el usuario a la vez.
+            AuthUser user = jwtProvider.parseToken(token);
+            if (user != null) {
+                var authorities = user.roles().stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .toList();
 
-            var authorities = user.roles().stream()
-                    .map(SimpleGrantedAuthority::new)
-                    .toList();
-
-            var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
-            SecurityContextHolder.getContext().setAuthentication(auth);
+                var auth = new UsernamePasswordAuthenticationToken(user, null, authorities);
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            }
         }
 
         chain.doFilter(request, response);

@@ -1,6 +1,7 @@
 package dev.pimon.security.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.pimon.common.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import dev.pimon.security.filter.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
@@ -23,7 +24,6 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Configuración de Spring Security.
@@ -66,15 +66,19 @@ public class SecurityConfig {
                         .authenticationEntryPoint((req, res, e) -> {
                             res.setStatus(HttpStatus.UNAUTHORIZED.value());
                             res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(res.getWriter(),
-                                    Map.of("success", false, "message", "No autenticado — incluye el token JWT en el header Authorization: Bearer <token>"));
+                            res.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(res.getWriter(), ApiResponse.error(
+                                    "No autenticado — incluye el token JWT en el header Authorization: Bearer <token>",
+                                    "UNAUTHENTICATED", null));
                         })
                         // 403 — autenticado pero sin permisos
                         .accessDeniedHandler((req, res, e) -> {
                             res.setStatus(HttpStatus.FORBIDDEN.value());
                             res.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                            objectMapper.writeValue(res.getWriter(),
-                                    Map.of("success", false, "message", "Acceso denegado — no tienes permisos para este recurso"));
+                            res.setCharacterEncoding("UTF-8");
+                            objectMapper.writeValue(res.getWriter(), ApiResponse.error(
+                                    "Acceso denegado — no tienes permisos para este recurso",
+                                    "ACCESS_DENIED", null));
                         })
                 )
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
@@ -89,7 +93,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(props.getCors().getAllowedOrigins());
+
+        List<String> origins = props.getCors().getAllowedOrigins();
+        // Con allowCredentials(true) no se puede usar setAllowedOrigins("*") (la spec lo prohíbe):
+        // si el usuario configura "*", lo traducimos a allowedOriginPatterns, que sí es compatible.
+        if (origins.contains("*")) {
+            config.setAllowedOriginPatterns(origins);
+        } else {
+            config.setAllowedOrigins(origins);
+        }
+
         config.setAllowedMethods(props.getCors().getAllowedMethods());
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

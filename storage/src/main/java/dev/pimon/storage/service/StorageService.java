@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.*;
 import java.util.UUID;
 
@@ -53,9 +54,22 @@ public class StorageService {
             String originalExt = getExtension(file.getOriginalFilename());
             String uuid        = UUID.randomUUID().toString();
 
-            // Intentar conversión a WebP
-            if (props.getWebp().isEnabled() && isImage(file.getContentType())) {
-                tempFile = uploadDir.resolve(uuid + "." + originalExt);
+            // Intentar conversión a WebP.
+            //
+            // LO QUE YA ES WEBP NO SE CONVIERTE. Convertirlo hacía dos destrozos a la vez,
+            // porque el temporal y el destino caían en el MISMO nombre (uuid.webp):
+            // cwebp abría el destino para escribir y con eso vaciaba su propia entrada, y
+            // si aun así devolvía éxito, el deleteSilently(tempFile) de después borraba el
+            // fichero recién escrito. El resultado era una imagen rota o un 404.
+            // Y ni siquiera hacía falta: ya está en el formato de destino, y volver a
+            // comprimir algo que ya venía comprimido con pérdida solo lo empeora.
+            boolean yaEsWebP = "image/webp".equalsIgnoreCase(file.getContentType())
+                               || "webp".equals(originalExt);
+
+            if (props.getWebp().isEnabled() && isImage(file.getContentType()) && !yaEsWebP) {
+                // EL TEMPORAL LLEVA SUFIJO para no poder coincidir nunca con el destino,
+                // pase lo que pase con la extensión de origen.
+                tempFile = uploadDir.resolve(uuid + "-origen." + originalExt);
                 file.transferTo(tempFile);
 
                 Path webpFile = uploadDir.resolve(uuid + ".webp");
@@ -63,13 +77,17 @@ public class StorageService {
                     finalFile      = webpFile;
                     convertedToWebP = true;
                     deleteSilently(tempFile);
+                    tempFile = null;
                 } else {
-                    // cwebp no disponible → usar archivo original
-                    finalFile = tempFile;
-                    tempFile  = null;  // ya es el final, no borrar
+                    // cwebp no disponible → se queda el original, pero con su nombre
+                    // definitivo: nadie tiene por qué ver un «-origen» en una URL pública.
+                    finalFile = uploadDir.resolve(uuid + "." + originalExt);
+                    Files.move(tempFile, finalFile, StandardCopyOption.REPLACE_EXISTING);
+                    tempFile = null;
                 }
             } else {
-                // Archivo no imagen (pdf, etc.) → guardar tal cual
+                // Lo que no se convierte —un pdf, o una imagen que ya es WebP— se guarda
+                // tal cual, con su propia extensión.
                 finalFile = uploadDir.resolve(uuid + "." + originalExt);
                 file.transferTo(finalFile);
             }
@@ -139,10 +157,48 @@ public class StorageService {
             throw AppException.badRequest(
                     "El archivo supera el tamaño máximo de " + props.getMaxSizeMb() + " MB");
         }
+
+        validateMagicBytes(file, contentType);
+    }
+
+    /**
+     * Valida la <b>firma binaria real</b> (magic bytes) del archivo. El {@code Content-Type} lo envía
+     * el cliente y es falsificable; aquí confirmamos que un archivo declarado como imagen lo es de
+     * verdad antes de guardarlo o pasarlo a cwebp.
+     */
+    private void validateMagicBytes(MultipartFile file, String contentType) {
+        if (contentType == null || !contentType.startsWith("image/")) return;
+
+        byte[] head = new byte[12];
+        int read;
+        try (InputStream in = file.getInputStream()) {
+            read = in.readNBytes(head, 0, head.length);
+        } catch (IOException e) {
+            throw AppException.badRequest("No se pudo leer el archivo");
+        }
+        if (read < 4 || !isKnownImage(head)) {
+            throw AppException.badRequest("El contenido del archivo no coincide con una imagen válida");
+        }
+    }
+
+    private boolean isKnownImage(byte[] h) {
+        // JPEG: FF D8 FF
+        if ((h[0] & 0xFF) == 0xFF && (h[1] & 0xFF) == 0xD8 && (h[2] & 0xFF) == 0xFF) return true;
+        // PNG: 89 'P' 'N' 'G'
+        if ((h[0] & 0xFF) == 0x89 && h[1] == 'P' && h[2] == 'N' && h[3] == 'G') return true;
+        // GIF: "GIF8"
+        if (h[0] == 'G' && h[1] == 'I' && h[2] == 'F' && h[3] == '8') return true;
+        // WEBP: "RIFF"...."WEBP"
+        if (h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
+                && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P') return true;
+        // HEIC/HEIF (y otros ISO-BMFF): caja "ftyp" en el offset 4
+        return h[4] == 'f' && h[5] == 't' && h[6] == 'y' && h[7] == 'p';
     }
 
     private Path resolveDir(String subdir) {
-        Path dir = Path.of(props.getUploadDir()).resolve(sanitize(subdir));
+        // Ruta absoluta y normalizada: colapsa cualquier ".." (defensa en profundidad junto al
+        // saneo de subdir/extensión) y evita ambigüedades de transferTo con rutas relativas.
+        Path dir = Path.of(props.getUploadDir()).resolve(sanitize(subdir)).toAbsolutePath().normalize();
         try {
             Files.createDirectories(dir);
         } catch (IOException e) {
@@ -157,10 +213,20 @@ public class StorageService {
         return base + sanitize(subdir) + "/" + filename;
     }
 
+    /**
+     * Extrae la extensión del nombre de archivo del usuario y la <b>sanea</b>: solo se
+     * conservan caracteres alfanuméricos. Imprescindible porque la extensión se concatena a
+     * la ruta de guardado — sin sanear, un nombre como {@code "x.png/../../etc/passwd"}
+     * permitiría un path traversal. Se limita además su longitud.
+     */
     private String getExtension(String filename) {
         if (filename == null) return "bin";
         int dot = filename.lastIndexOf('.');
-        return dot >= 0 ? filename.substring(dot + 1).toLowerCase() : "bin";
+        String ext = (dot >= 0 ? filename.substring(dot + 1) : "")
+                .toLowerCase()
+                .replaceAll("[^a-z0-9]", "");
+        if (ext.isBlank()) return "bin";
+        return ext.length() > 5 ? ext.substring(0, 5) : ext;
     }
 
     private boolean isImage(String contentType) {

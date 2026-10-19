@@ -9,7 +9,7 @@
   </parent>
   <groupId>io.github.adrianmartincano</groupId>
   <artifactId>libs-parent</artifactId>
-  <version>1.1.12</version>
+  <version>0.12.5</version>
   <packaging>pom</packaging>
   <name>Spring Libs</name>
   <description>Módulos Spring Boot reutilizables: autenticación, usuarios, productos, ecommerce, storage, CMS, emails, reservas y newsletter.</description>
@@ -20,11 +20,18 @@
     <module>users</module>
     <module>products</module>
     <module>ecommerce</module>
+    <module>blog</module>
+    <module>forum</module>
     <module>storage</module>
     <module>cms</module>
     <module>reservations</module>
+    <module>dining</module>
+    <module>menu</module>
     <module>emails</module>
     <module>newsletter</module>
+    <module>fx</module>
+    <module>events</module>
+    <module>google</module>
   </modules>
   <properties>
     <java.version>21</java.version>
@@ -110,6 +117,16 @@
       </dependency>
       <dependency>
         <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-blog</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-forum</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
         <artifactId>spring-storage</artifactId>
         <version>${project.version}</version>
       </dependency>
@@ -126,6 +143,26 @@
       <dependency>
         <groupId>io.github.adrianmartincano</groupId>
         <artifactId>spring-reservations</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-dining</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-menu</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-fx</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>io.github.adrianmartincano</groupId>
+        <artifactId>spring-google</artifactId>
         <version>${project.version}</version>
       </dependency>
       <!-- Stripe -->

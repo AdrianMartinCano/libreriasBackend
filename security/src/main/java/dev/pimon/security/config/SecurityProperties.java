@@ -23,7 +23,10 @@ import java.util.List;
 @ConfigurationProperties(prefix = "pimon.security")
 public class SecurityProperties {
 
-    private String jwtSecret = "libui-default-secret-change-in-production-32chars";
+    /** Secreto por defecto (SOLO desarrollo). Si se usa en producción, JwtTokenProvider avisa al arrancar. */
+    public static final String DEFAULT_JWT_SECRET = "libui-default-secret-change-in-production-32chars";
+
+    private String jwtSecret = DEFAULT_JWT_SECRET;
     private long   accessTokenExpiration = 86_400_000L;
 
     private List<String> publicPaths = List.of(

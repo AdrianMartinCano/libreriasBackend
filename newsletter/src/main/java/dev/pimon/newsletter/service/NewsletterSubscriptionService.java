@@ -19,6 +19,7 @@ import dev.pimon.newsletter.entity.NewsletterSubscriber.SubscriberStatus;
 import dev.pimon.newsletter.repository.NewsletterCampaignRepository;
 import dev.pimon.newsletter.repository.NewsletterSubscriberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NewsletterSubscriptionService {
@@ -43,6 +45,7 @@ public class NewsletterSubscriptionService {
     private final NewsletterProperties           props;
     private final EmailProperties                emailProps;
     private final EmailService                   emailService;
+    private final CampaignDispatcher             campaignDispatcher;
 
     @Transactional
     public SubscriptionResultDto subscribe(SubscribeRequest req) {
@@ -112,18 +115,52 @@ public class NewsletterSubscriptionService {
         try (PrintWriter writer = new PrintWriter(out, true, StandardCharsets.UTF_8)) {
             writer.println("email,source,status,createdAt,confirmedAt");
             for (NewsletterSubscriber s : subscribers) {
-                writer.printf("%s,%s,%s,%s,%s%n",
-                        s.getEmail(),
-                        s.getSource() != null ? s.getSource() : "",
-                        s.getStatus().name().toLowerCase(),
-                        s.getCreatedAt(),
-                        s.getConfirmedAt() != null ? s.getConfirmedAt() : "");
+                writer.println(String.join(",",
+                        csv(s.getEmail()),
+                        csv(s.getSource()),
+                        csv(s.getStatus().name().toLowerCase()),
+                        csv(s.getCreatedAt()),
+                        csv(s.getConfirmedAt())));
             }
         }
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    @Transactional
+    /**
+     * Escapa un campo CSV de forma segura:
+     * <ul>
+     *   <li>neutraliza la <b>inyección de fórmulas</b> (Excel/Sheets ejecutan celdas que empiezan
+     *       por {@code = + - @}, tab o retorno) anteponiendo una comilla simple;</li>
+     *   <li>entrecomilla y duplica comillas si el valor contiene coma, comilla o salto de línea.</li>
+     * </ul>
+     */
+    private static String csv(Object value) {
+        if (value == null) return "";
+        String s = value.toString();
+        if (!s.isEmpty() && "=+-@\t\r".indexOf(s.charAt(0)) >= 0) {
+            s = "'" + s;
+        }
+        if (s.contains("\"") || s.contains(",") || s.contains("\n") || s.contains("\r")) {
+            s = "\"" + s.replace("\"", "\"\"") + "\"";
+        }
+        return s;
+    }
+
+    /**
+     * Envía una campaña a los suscriptores confirmados.
+     *
+     * <p><b>Sin transacción de larga duración:</b> el registro de la campaña se persiste primero
+     * (en su propia transacción vía {@code save}) y los emails se envían <b>fuera</b> de cualquier
+     * transacción de BD — enviar N emails SMTP mientras se mantiene abierta una transacción
+     * mantendría conexión y bloqueos tomados innecesariamente.</p>
+     *
+     * <p><b>Resiliente por destinatario:</b> el envío lo realiza {@link CampaignDispatcher} (un fallo
+     * a un suscriptor se registra y no detiene al resto).</p>
+     *
+     * <p><b>Asíncrono:</b> el registro de la campaña se persiste primero (transacción corta) y el
+     * bucle de envío se delega a un hilo acotado, de modo que el endpoint de admin responde al
+     * instante aunque haya miles de destinatarios.</p>
+     */
     public CampaignDto sendCampaign(SendCampaignRequest req) {
         List<NewsletterSubscriber> recipients =
                 repo.findByStatus(SubscriberStatus.CONFIRMED, Pageable.unpaged()).getContent();
@@ -133,11 +170,10 @@ public class NewsletterSubscriptionService {
         campaign.setBody(req.body());
         campaign.setRecipientCount(recipients.size());
         campaign.setSentAt(LocalDateTime.now());
-        campaignRepo.save(campaign);
+        campaignRepo.save(campaign);   // transacción propia y corta; el registro queda persistido
 
-        for (NewsletterSubscriber sub : recipients) {
-            sendCampaignEmail(sub, req);
-        }
+        // Envío fuera de transacción y en segundo plano.
+        campaignDispatcher.dispatch(recipients, req);
 
         return CampaignDto.from(campaign);
     }
@@ -168,22 +204,6 @@ public class NewsletterSubscriptionService {
                 template.get().getTemplateFile(),
                 Map.of("subject", subject, "body", body, "unsubscribeUrl", "#", "brand", brandVars()));
         return new CampaignPreviewDto(html);
-    }
-
-    private void sendCampaignEmail(NewsletterSubscriber sub, SendCampaignRequest req) {
-        String unsubscribeUrl = props.getBaseUrl() + "/api/newsletter/unsubscribe?token=" + sub.getUnsubscribeToken();
-
-        Optional<CampaignTemplate> template = CampaignTemplate.fromId(req.templateId());
-        if (template.isEmpty()) {
-            emailService.sendHtml(sub.getEmail(), req.subject(), req.body());
-            return;
-        }
-
-        emailService.sendTemplate(
-                sub.getEmail(),
-                req.subject(),
-                template.get().getTemplateFile(),
-                Map.of("subject", req.subject(), "body", req.body(), "unsubscribeUrl", unsubscribeUrl, "brand", brandVars()));
     }
 
     /** Datos de marca para parametrizar las plantillas de email genéricas. */

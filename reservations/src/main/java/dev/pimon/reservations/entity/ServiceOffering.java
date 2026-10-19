@@ -5,14 +5,20 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import dev.pimon.common.entity.BaseEntity;
+import org.hibernate.annotations.BatchSize;
 
 import java.math.BigDecimal;
 
+/**
+ * {@code @BatchSize} evita el N+1 al listar reservas: las cargas LAZY del servicio asociado
+ * se agrupan en lotes ("... IN (?, ?, ...)") en vez de una consulta por reserva.
+ */
 @Entity
 @Table(name = "reservation_services")
 @Getter
 @Setter
 @NoArgsConstructor
+@BatchSize(size = 50)
 public class ServiceOffering extends BaseEntity {
 
     @Column(nullable = false)

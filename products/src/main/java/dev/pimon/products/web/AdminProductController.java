@@ -7,6 +7,11 @@ import dev.pimon.products.dto.CreateProductRequest;
 import dev.pimon.products.dto.ProductDto;
 import dev.pimon.products.dto.UpdateProductRequest;
 import dev.pimon.products.service.ProductService;
+import dev.pimon.common.dto.PageResponse;
+import dev.pimon.products.dto.ProductFilter;
+import org.springdoc.core.annotations.ParameterObject;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -19,6 +24,23 @@ import org.springframework.web.bind.annotation.*;
 public class AdminProductController {
 
     private final ProductService service;
+
+    /**
+     * TODOS los productos, publicados y ocultos.
+     *
+     * <h2>Por que no vale el listado publico</h2>
+     *
+     * Aquel excluye los inactivos sin excepcion, que es lo correcto de cara al cliente pero
+     * inservible para el panel: quien administra dejaria de ver justo lo que acaba de
+     * retirar, y entonces no habria forma de volver a publicarlo salvo tocando la base a
+     * mano. Un estado del que no se puede volver no es un estado, es una trampa.
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<PageResponse<ProductDto>>> list(
+            @ParameterObject ProductFilter filter,
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok(service.listAll(filter, pageable)));
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductDto>> get(@PathVariable String id) {

@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0          http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.adrianmartincano</groupId>
+    <artifactId>libs-parent</artifactId>
+    <version>0.12.5</version>
+  </parent>
+  <artifactId>spring-blog</artifactId>
+  <!-- Override puntual (resto de módulos en 1.0.0): 1.0.1 borrar comentarios. -->
+  <name>Spring Blog</name>
+  <description>Blog: posts cronológicos (admin escribe, público lee) y comentarios de usuarios registrados.</description>
+  <dependencies>
+    <!-- Versión explícita 1.0.0: blog va por delante (1.0.1) pero las hermanas siguen en 1.0.0. -->
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.github.adrianmartincano</groupId>
+      <artifactId>spring-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+    </dependency>
+  </dependencies>
+</project>

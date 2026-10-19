@@ -34,10 +34,14 @@ public class StorageProperties {
 
     private int maxSizeMb = 10;
 
+    /**
+     * Tipos MIME permitidos. SVG NO se incluye por defecto: puede contener scripts y, servido
+     * inline desde /uploads, sería un vector de XSS. Si lo necesitas (logos vectoriales de
+     * confianza), añádelo explícitamente — el filtro de cabeceras fuerza igualmente su descarga.
+     */
     private List<String> allowedTypes = List.of(
             "image/jpeg", "image/png", "image/gif",
-            "image/webp", "image/svg+xml",
-            "image/heic", "image/heif"
+            "image/webp", "image/heic", "image/heif"
     );
 
     private WebP webp = new WebP();

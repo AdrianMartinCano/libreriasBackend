@@ -4,11 +4,11 @@
   <parent>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>libs-parent</artifactId>
-    <version>1.1.12</version>
+    <version>0.12.5</version>
   </parent>
   <artifactId>spring-security</artifactId>
   <name>Spring Security</name>
-  <description>AutenticaciÃ³n JWT con Spring Security. Incluye filtro JWT, SecurityConfig y @CurrentUser.</description>
+  <description>Autenticación JWT con Spring Security. Incluye filtro JWT, SecurityConfig y @CurrentUser.</description>
   <dependencies>
     <dependency>
       <groupId>io.github.adrianmartincano</groupId>

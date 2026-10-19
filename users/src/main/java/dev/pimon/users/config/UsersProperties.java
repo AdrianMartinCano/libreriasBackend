@@ -23,4 +23,22 @@ public class UsersProperties {
     private String adminEmail    = "admin@example.com";
     private String adminPassword = "Admin1234!";
     private String adminName     = "Administrador";
+
+    private Recuperacion recuperacion = new Recuperacion();
+
+    /**
+     * Recuperar la contrasena olvidada.
+     *
+     * <h2>Una hora, ni mas ni menos</h2>
+     *
+     * Un enlace de recuperacion acaba en la bandeja de entrada y ahi se queda: cuanto mas
+     * vive, mas tiempo hay para que alguien lo encuentre —un movil prestado, un correo
+     * reenviado sin pensar—. Y demasiado corto tampoco vale: quien lo pide desde el movil
+     * y va a por el portatil necesita un rato.
+     */
+    @Data
+    public static class Recuperacion {
+        /** Cuanto vale el enlace desde que se emite. */
+        private java.time.Duration validez = java.time.Duration.ofHours(1);
+    }
 }

@@ -4,11 +4,11 @@
   <parent>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>libs-parent</artifactId>
-    <version>1.1.12</version>
+    <version>0.12.5</version>
   </parent>
   <artifactId>spring-products</artifactId>
   <name>Spring Products</name>
-  <description>CatÃ¡logo de productos y categorÃ­as con filtros, paginaciÃ³n y bÃºsqueda.</description>
+  <description>Catálogo de productos y categorías con filtros, paginación y búsqueda.</description>
   <dependencies>
     <dependency>
       <groupId>io.github.adrianmartincano</groupId>

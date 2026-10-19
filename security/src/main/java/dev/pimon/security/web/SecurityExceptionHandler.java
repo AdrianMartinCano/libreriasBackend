@@ -32,6 +32,7 @@ public class SecurityExceptionHandler {
         log.warn("Acceso denegado por @PreAuthorize: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("Acceso denegado — no tienes permisos para este recurso"));
+                .body(ApiResponse.error("Acceso denegado — no tienes permisos para este recurso",
+                        "ACCESS_DENIED", null));
     }
 }

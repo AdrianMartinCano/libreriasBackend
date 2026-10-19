@@ -4,11 +4,11 @@
   <parent>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>libs-parent</artifactId>
-    <version>1.1.12</version>
+    <version>0.12.5</version>
   </parent>
   <artifactId>spring-cms</artifactId>
   <name>Spring CMS</name>
-  <description>PÃ¡ginas de contenido dinÃ¡mico almacenadas como arrays de bloques JSON.</description>
+  <description>Páginas de contenido dinámico almacenadas como arrays de bloques JSON.</description>
   <dependencies>
     <dependency>
       <groupId>io.github.adrianmartincano</groupId>

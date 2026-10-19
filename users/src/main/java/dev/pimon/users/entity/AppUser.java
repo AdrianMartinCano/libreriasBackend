@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import dev.pimon.common.entity.BaseEntity;
+import org.hibernate.annotations.BatchSize;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -31,10 +32,14 @@ public class AppUser extends BaseEntity {
     @Column(nullable = false)
     private String name;
 
+    // EAGER porque los roles se necesitan en cada autenticación. @BatchSize evita el N+1
+    // al paginar usuarios: en lugar de 1 consulta de roles por usuario, Hibernate las agrupa
+    // en lotes con un único "... IN (?, ?, ...)".
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
+    @BatchSize(size = 50)
     private Set<Role> roles = new HashSet<>();
 
     private boolean active = true;

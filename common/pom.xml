@@ -4,11 +4,11 @@
   <parent>
     <groupId>io.github.adrianmartincano</groupId>
     <artifactId>libs-parent</artifactId>
-    <version>1.1.12</version>
+    <version>0.12.5</version>
   </parent>
   <artifactId>spring-common</artifactId>
   <name>Spring Common</name>
-  <description>Clases base, respuestas API estÃ¡ndar, entidad JPA y manejo global de errores.</description>
+  <description>Clases base, respuestas API estándar, entidad JPA y manejo global de errores.</description>
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -17,6 +17,13 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <!-- La lib que gestiona los errores de validaci�n (GlobalExceptionHandler) debe
+         declarar la validaci�n: garantiza Jakarta Validation + Hibernate Validator en
+         el classpath y que @Valid/@Validated funcionen en todos los m�dulos consumidores. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
