@@ -91,13 +91,9 @@ Ejemplo real de proyecto consumidor: `girandoMaderaBack` (tienda Girando Madera)
 
 ```bash
 # Compilar e instalar todo en el repo local de Maven
-
-> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 mvn clean install -DskipTests
 
 # Compilar un módulo concreto (con sus dependencias)
-
-> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 mvn clean install -pl newsletter -am -DskipTests
 ```
 
@@ -109,14 +105,8 @@ El CI (GitHub Actions) publica los módulos al pushear un tag `v*`:
 
 ```bash
 # 1. Sube la versión en el pom.xml raíz y en el <parent><version> de cada módulo
-
-> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 #    (lo hace publish.ps1, que lee la lista de módulos del propio pom padre)
-
-> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 # 2. Commit + tag + push
-
-> 🪞 **Espejo público.** El desarrollo se hace en un repositorio privado; este se actualiza periódicamente con una instantánea del código.
 git commit -am "chore: bump version to 1.0.0"
 git tag v1.0.0
 git push && git push --tags
